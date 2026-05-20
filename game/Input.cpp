@@ -1,4 +1,6 @@
 #include "Input.h"
+#include "Input.h"
+#include "Game.h"
 
 std::vector<Input::Key> Input::Keys = {};
 Vector2 Input::mMousePosition = Vector2::One;

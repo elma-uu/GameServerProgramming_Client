@@ -1,6 +1,8 @@
 #pragma once
 #include "framework.h"
-#include "Game.h"
+
+// Forward declaration to avoid circular dependency
+class Game;
 
 extern Game GAME;
 

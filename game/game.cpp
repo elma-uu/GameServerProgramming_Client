@@ -1,6 +1,8 @@
 #include "Game.h"
+#include "Game.h"
+#include "Input.h"
 
-
+Game GAME;
 
 Game::Game()
 	: mHwnd(nullptr)
