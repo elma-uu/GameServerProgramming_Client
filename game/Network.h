@@ -1,6 +1,6 @@
 #pragma once
-#include "Windows.h"
 #include "WinSock2.h"
+#include "Windows.h"
 #include "protocol_2026.h"
 
 class Network

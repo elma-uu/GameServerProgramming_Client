@@ -1,3 +1,4 @@
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include "Network.h"
 
 Network::Network()
@@ -16,6 +17,7 @@ Network::~Network()
 
 bool Network::Connect(const char* ip, int port)
 {
+	mServerAddr.sin_family = AF_INET;
 	mServerAddr.sin_port = htons(port);
 	mServerAddr.sin_addr.s_addr = inet_addr(ip);
 	mSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, 0);
@@ -30,14 +32,15 @@ bool Network::Connect(const char* ip, int port)
 void Network::Send(void* packet)
 {
 	unsigned char* p = reinterpret_cast<unsigned char*>(packet);
-	LPDWORD sent{ 0 };
-	WSASend(mSocket, reinterpret_cast<WSABUF*>(&p), 1, sent, 0, NULL, NULL);
+	DWORD sent = 0;
+	WSASend(mSocket, reinterpret_cast<WSABUF*>(&p), 1, &sent, 0, NULL, NULL);
 }
 
 int Network::Receive(char* buffer, int bufferSize)
 {
-	LPDWORD received{ 0 };
-	WSARecv(mSocket, reinterpret_cast<WSABUF*>(&buffer), 1, received, NULL, NULL, NULL);
+	DWORD received = 0;
+	int result = WSARecv(mSocket, reinterpret_cast<WSABUF*>(&buffer), 1, &received, NULL, NULL, NULL);
+	return (result == SOCKET_ERROR) ? -1 : static_cast<int>(received);
 }
 
 void Network::ProcessPacket(char* recv_packet)
@@ -72,6 +75,6 @@ void Network::ProcessPacket(char* recv_packet)
 
 	default:
 		// Unknown Packet Type
-	break;
-
+		break;
+	}
 }
