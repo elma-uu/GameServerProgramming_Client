@@ -13,3 +13,16 @@
 #include <malloc.h>
 #include <memory.h>
 #include <tchar.h>
+
+#include <Windows.h>
+#include <vector>
+#include <algorithm>
+#include <string>
+#include <map>
+#include <iostream>
+#include "Math.h"
+#include <objidl.h>
+#include <gdiplus.h>
+#include <random>
+#include <atlimage.h>
+#include <queue>
