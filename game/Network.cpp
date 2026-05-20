@@ -39,3 +39,39 @@ int Network::Receive(char* buffer, int bufferSize)
 	LPDWORD received{ 0 };
 	WSARecv(mSocket, reinterpret_cast<WSABUF*>(&buffer), 1, received, NULL, NULL, NULL);
 }
+
+void Network::ProcessPacket(char* recv_packet)
+{
+	switch (static_cast<PACKET_TYPE>(recv_packet[1]))
+	{
+	case S2C_LOGIN_RESULT:
+	{
+		S2C_LoginResult* packet = reinterpret_cast<S2C_LoginResult*>(recv_packet);
+		if (packet->success)
+		{
+			// 로그인 성공 처리
+		}
+		else
+		{
+			// 로그인 실패 처리
+		}
+	}
+	break;
+	case S2C_AVATAR_INFO:
+	{
+		S2C_AvatarInfo* packet = reinterpret_cast<S2C_AvatarInfo*>(recv_packet);
+		// 아바타 정보 처리
+	}
+	break;
+	case S2C_ADD_OBJECT:
+	{
+		S2C_AddObject* packet = reinterpret_cast<S2C_AddObject*>(recv_packet);
+		// 객체 추가 처리
+	}
+	break;
+
+	default:
+		// Unknown Packet Type
+	break;
+
+}

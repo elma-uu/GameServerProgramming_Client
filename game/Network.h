@@ -16,5 +16,6 @@ public:
 	bool Connect(const char* ip, int port);
 	void Send(void* packet);
 	int Receive(char* buffer, int bufferSize);
+	void ProcessPacket(char* packet);
 };
 
