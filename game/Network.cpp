@@ -3,4 +3,5 @@
 Network::Network()
 {
 	mSocket = INVALID_SOCKET;
+
 }

@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "Input.h"
 #include "Time.h"
+#include "Camera.h"
 
 class Game
 {
@@ -15,6 +16,7 @@ public:
 	void LateUpdate();
 	void Render();
 	HWND GetHwnd() { return mHwnd; }
+	Camera* GetCamera() { return &mCamera; }
 
 private:
 	void clearRenderTarget();
@@ -32,6 +34,8 @@ private:
 
 	UINT mWidth;
 	UINT mHeight;
+
+	Camera mCamera;
 
 };
 

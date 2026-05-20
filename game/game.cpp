@@ -25,6 +25,8 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 	createBuffer(width, height);
 	initializeEtc();
 
+	// 카메라 초기화: 맵(20x20 타일), 타일 크기(100), 뷰(20x20 타일)
+	mCamera.Initialize(20, 20, 100, 12, 12);
 }
 void Game::Run()
 {
@@ -36,6 +38,7 @@ void Game::Update()
 {
 	Input::Update();
 	Time::Update();
+	mCamera.Update();
 }
 void Game::LateUpdate()
 {

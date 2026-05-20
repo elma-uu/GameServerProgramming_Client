@@ -11,6 +11,15 @@ public:
 	virtual void LateUpdate();
 	virtual void Render(HDC hdc);
 
+	// Setter
+	void SetPosition(short x, short y) { mX = x; mY = y; }
+
+	// Getter
+	short GetX() const { return mX; }
+	short GetY() const { return mY; }
+	short GetHp() const { return hp; }
+	void SetHp(short h) { hp = h; }
+
 private:
 	short mX;
 	short mY;
