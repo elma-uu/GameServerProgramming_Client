@@ -6,6 +6,7 @@
 #include "Camera.h"
 #include "Player.h"
 #include "Map.h"
+#include "MiniMap.h"
 
 class Game
 {
@@ -43,5 +44,6 @@ private:
 	Camera mCamera;
 	Player mPlayer;
 	Map mMap;
+	MiniMap mMiniMap;
 };
 

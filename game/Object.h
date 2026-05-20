@@ -17,20 +17,20 @@ public:
 	virtual void Render(HDC hdc);
 
 	// Setter
-	void SetPosition(short x, short y) { mX = x; mY = y; }
+	void SetPosition(int x, int y) { mX = x; mY = y; }
 
 	// Getter
-	short GetX() const { return mX; }
-	short GetY() const { return mY; }
-	short GetHp() const { return hp; }
-	void SetHp(short h) { hp = h; }
+	int GetX() const { return mX; }
+	int GetY() const { return mY; }
+	int GetHp() const { return hp; }
+	void SetHp(int h) { hp = h; }
 
 private:
-	short mX;
-	short mY;
-	short hp;
-	short level;
-	short exp;
+	int mX;      // int로 변경 (short는 최대 32,767이라 오버플로우 발생)
+	int mY;      // int로 변경
+	int hp;      // int로 변경
+	int level;   // int로 변경
+	int exp;     // int로 변경
 	std::unordered_map<int, Object> mViewList;
 };
 

@@ -44,9 +44,9 @@ void Camera::SetTarget(int targetX, int targetY)
 
 void Camera::Update()
 {
-    // 카메라를 스무딩하면서 이동
-    mCameraX = (int)(mCameraX + (mTargetX - mCameraX) * mCameraEasing);
-    mCameraY = (int)(mCameraY + (mTargetY - mCameraY) * mCameraEasing);
+    // 카메라를 즉시 이동 (스무딩 제거)
+    mCameraX = mTargetX;
+    mCameraY = mTargetY;
 
     ClampCamera();
 }
