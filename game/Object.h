@@ -1,6 +1,11 @@
 #pragma once
+#pragma once
+
 #include "Windows.h"
 #include <unordered_map>
+
+// Forward declaration
+class Camera;
 
 class Object
 {

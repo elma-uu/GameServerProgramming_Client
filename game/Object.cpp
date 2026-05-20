@@ -1,4 +1,5 @@
 #include "Object.h"
+#include "Object.h"
 
 Object::Object()
 	: mX(0)
@@ -24,4 +25,3 @@ void Object::LateUpdate()
 void Object::Render(HDC hdc)
 {
 }
-
