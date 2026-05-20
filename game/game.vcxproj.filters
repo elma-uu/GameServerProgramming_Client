@@ -28,6 +28,9 @@
     <Filter Include="Network">
       <UniqueIdentifier>{564f092e-e92d-4755-9edf-e8bff16fb9dc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Map">
+      <UniqueIdentifier>{62725680-7177-4878-86da-3b32ef8c853d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -70,6 +73,9 @@
       <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="Map.h">
+      <Filter>Map</Filter>
+    </ClInclude>
+    <ClInclude Include="MiniMap.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
@@ -102,6 +108,9 @@
       <Filter>Common</Filter>
     </ClCompile>
     <ClCompile Include="Map.cpp">
+      <Filter>Map</Filter>
+    </ClCompile>
+    <ClCompile Include="MiniMap.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
