@@ -47,5 +47,5 @@ private:
 	MiniMap mMiniMap;
 };
 
-Game GAME;
+
 

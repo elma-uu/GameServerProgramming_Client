@@ -32,7 +32,7 @@ void MiniMap::Initialize(int mapTilesX, int mapTilesY, int tileSize)
 void MiniMap::Render(HDC hdc)
 {
     Camera* camera = GAME.GetCamera();
-    Player* player = GAME.GetPlayer();
+    Player* player = GAME.GetAvatar();
 
     // 미니맵 배경 (검은색)
     HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));

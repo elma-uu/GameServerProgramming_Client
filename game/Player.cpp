@@ -7,11 +7,11 @@
 
 // 한 프레임당 이동 거리 (테스트용)
 // 60FPS 기준: 200픽셀/초 ÷ 60fps = 약 3.33픽셀/프레임
-const int TILE_SIZE = 100;
-const float MOVE_TIME = 0.5f;  // 0.5초에 1칸
-const int PLAYER_SPEED = (int)(TILE_SIZE / MOVE_TIME);  // 200 픽셀/초
 const int PLAYER_SIZE = 50;    // player sprite size
-const int FRAME_MOVE = 5;      // 테스트: 프레임당 5픽셀 이동
+const int TILE_SIZE = PLAYER_SIZE;  // 맵 한칸 크기 = 플레이어 크기
+const float MOVE_TIME = 0.5f;  // 0.5초에 1칸
+const int PLAYER_SPEED = (int)(TILE_SIZE / MOVE_TIME);  // 100 픽셀/초
+const int FRAME_MOVE = 2;      // 테스트: 프레임당 2픽셀 이동
 
 Player::Player()
 {

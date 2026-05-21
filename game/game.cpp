@@ -24,18 +24,17 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 	createBuffer(width, height);
 	initializeEtc();
 
-	// 카메라 초기화: 맵(2000x2000 타일), 타일 크기(100), 뷰(20x11 타일)
-	// 맵 총 크기: 2000*100 = 200,000 픽셀
-	mCamera.Initialize(2000, 2000, 100, 20, 11);
+	// 카메라 초기화: 맵(2000x2000 타일), 타일 크기(50), 뷰(40x22 타일)
+	// 맵 총 크기: 2000*50 = 100,000 픽셀
+	mCamera.Initialize(2000, 2000, 50, 40, 22);
 
-	// 맵 초기화: 2000x2000 타일, 타일 크기 100
-	mMap.Initialize(2000, 2000, 100);
-
-	// 미니맵 초기화: 2000x2000 타일, 타일 크기 100
-	mMiniMap.Initialize(2000, 2000, 100);
+	// 맵 초기화: 2000x2000 타일, 타일 크기 50
+	mMap.Initialize(2000, 2000, 50);
+	// 미니맵 초기화: 2000x2000 타일, 타일 크기 50
+	mMiniMap.Initialize(2000, 2000, 50);
 
 	// 플레이어 초기 위치 설정 (월드 좌표, 타일 단위)
-	mAvatar.SetPosition(100000, 100000);
+	mAvatar.SetPosition(50000, 50000);
 }
 void Game::Run()
 {
