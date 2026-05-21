@@ -63,13 +63,32 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_AVATAR_INFO:
 	{
 		S2C_AvatarInfo* packet = reinterpret_cast<S2C_AvatarInfo*>(recv_packet);
-		// 아바타 정보 처리
+		GAME.GetAvatar()
+			->SetPlayerInfo(packet->playerId, packet->x, packet->y, packet->hp, packet->max_hp, packet->exp, packet->level);
 	}
 	break;
 	case S2C_ADD_OBJECT:
 	{
 		S2C_AddObject* packet = reinterpret_cast<S2C_AddObject*>(recv_packet);
 		// 객체 추가 처리
+	}
+	break;
+	case S2C_REMOVE_OBJECT:
+	{
+		S2C_RemoveObject* packet = reinterpret_cast<S2C_RemoveObject*>(recv_packet);
+		// 객체 제거 처리
+	}
+	break;
+	case S2C_CHAT_MESSAGE:
+	{
+		S2C_ChatMessage* packet = reinterpret_cast<S2C_ChatMessage*>(recv_packet);
+		// 채팅 메시지 처리
+	}
+	break;
+	case S2C_STATUS_CHANGE:
+	{
+		S2C_StatusChange* packet = reinterpret_cast<S2C_StatusChange*>(recv_packet);
+		// 상태 변경 처리
 	}
 	break;
 

@@ -2,7 +2,6 @@
 #include "Game.h"
 #include "Input.h"
 
-Game GAME;
 
 Game::Game()
 	: mHwnd(nullptr)
@@ -36,7 +35,7 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 	mMiniMap.Initialize(2000, 2000, 100);
 
 	// 플레이어 초기 위치 설정 (월드 좌표, 타일 단위)
-	mPlayer.SetPosition(100000, 100000);
+	mAvatar.SetPosition(100000, 100000);
 }
 void Game::Run()
 {
@@ -48,12 +47,12 @@ void Game::Update()
 {
 	Input::Update();
 	Time::Update();
-	mPlayer.Update();
+	mAvatar.Update();
 	mCamera.Update();
 }
 void Game::LateUpdate()
 {
-	mPlayer.LateUpdate();
+	mAvatar.LateUpdate();
 }
 void Game::Render()
 {
@@ -63,7 +62,7 @@ void Game::Render()
 	mMap.Render(mBackHdc);
 
 	// 플레이어 렌더링
-	mPlayer.Render(mBackHdc);
+	mAvatar.Render(mBackHdc);
 
 	// 미니맵 렌더링
 	mMiniMap.Render(mBackHdc);

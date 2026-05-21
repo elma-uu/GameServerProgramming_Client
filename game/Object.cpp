@@ -4,9 +4,9 @@
 Object::Object()
 	: mX(0)
 	, mY(0)
-	, hp(100)
-	, level(1)
-	, exp(0)
+	, mHp(100)
+	, mLevel(1)
+	, mExp(0)
 {
 }
 

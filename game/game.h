@@ -22,7 +22,7 @@ public:
 	void Render();
 	HWND GetHwnd() { return mHwnd; }
 	Camera* GetCamera() { return &mCamera; }
-	Player* GetPlayer() { return &mPlayer; }
+	Player* GetAvatar() { return &mAvatar; }
 
 private:
 	void clearRenderTarget();
@@ -42,8 +42,10 @@ private:
 	UINT mHeight;
 
 	Camera mCamera;
-	Player mPlayer;
+	Player mAvatar;
 	Map mMap;
 	MiniMap mMiniMap;
 };
+
+Game GAME;
 

@@ -22,15 +22,17 @@ public:
 	// Getter
 	int GetX() const { return mX; }
 	int GetY() const { return mY; }
-	int GetHp() const { return hp; }
-	void SetHp(int h) { hp = h; }
+	int GetHp() const { return mHp; }
+	void SetHp(int h) { mHp = h; }
 
 private:
-	int mX;      // int로 변경 (short는 최대 32,767이라 오버플로우 발생)
-	int mY;      // int로 변경
-	int hp;      // int로 변경
-	int level;   // int로 변경
-	int exp;     // int로 변경
+	int mVisualId; // for future use (different visual appearances)
+	int mX;
+	int mY;
+	int mHp;
+	int mMaxHp;
+	unsigned long long mExp;
+	unsigned char mLevel;
 	std::unordered_map<int, Object> mViewList;
 };
 
