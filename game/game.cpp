@@ -44,8 +44,7 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 	mMiniMap.Initialize(2000, 2000, 50);
 
 	// 플레이어 초기 위치 설정 (월드 좌표, 타일 단위)
-	// 2000x2000 타일의 중앙 = 1000,1000
-	mAvatar.SetPosition(1000, 1000);
+	mAvatar.SetPosition(50000, 50000);
 }
 void Game::Run()
 {

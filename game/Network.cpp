@@ -19,44 +19,16 @@ Network::~Network()
 
 bool Network::Connect(const char* ip, int port)
 {
-	// Winsock 초기화
-	WSADATA wsa_data;
-	int ret = WSAStartup(MAKEWORD(2, 2), &wsa_data);
-	if (ret != 0)
-	{
-		OutputDebugString(L"WSAStartup Failed\n");
-		return false;
-	}
-
-	// 소켓 생성
-	mSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, 0);
-	if (mSocket == INVALID_SOCKET)
-	{
-		OutputDebugString(L"Socket Creation Failed\n");
-		return false;
-	}
-
-	// 서버 주소 설정
 	mServerAddr.sin_family = AF_INET;
 	mServerAddr.sin_port = htons(port);
 	mServerAddr.sin_addr.s_addr = inet_addr(ip);
-
-	// 서버에 연결
-	int result = WSAConnect(mSocket, (SOCKADDR*)&mServerAddr, sizeof(mServerAddr), NULL, NULL, NULL, NULL);
-
-	if (result == SOCKET_ERROR)
+	mSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, 0);
+	if (mSocket == INVALID_SOCKET)
 	{
-		int error = WSAGetLastError();
-		wchar_t error_msg[256];
-		swprintf_s(error_msg, L"WSAConnect Failed with error: %d\n", error);
-		OutputDebugString(error_msg);
-		closesocket(mSocket);
-		mSocket = INVALID_SOCKET;
 		return false;
 	}
-
-	OutputDebugString(L"Connected to Server Successfully!\n");
-	return true;
+	int result = WSAConnect(mSocket, (SOCKADDR*)&mServerAddr, sizeof(mServerAddr), NULL, NULL, NULL, NULL);
+	return result != SOCKET_ERROR;
 }
 
 void Network::Send(void* packet)
