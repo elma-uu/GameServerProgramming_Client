@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Object.h"
+#include <string>
 
 class Player : public Object
 {
@@ -25,7 +26,29 @@ public:
 		mLevel = level;
 	}
 
+	// Object management for render list
+	void AddObject(int objectId, const std::string& objName, int visualId, 
+		int x, int y, int hp, int max_hp, unsigned long long exp, unsigned char level);
+	void RemoveObject(int objectId);
+	void UpdateObjectPosition(int objectId, int x, int y);
+	void UpdateObjectStatus(int objectId, int hp, int max_hp, unsigned long long exp, unsigned char level);
+	void RenderObjects(HDC hdc);
+	void SendMoveToServer(int tileX, int tileY);
+
 private:
+	struct RenderObject
+	{
+		int object_id;
+		std::string obj_name;
+		int visual_id;
+		int x;
+		int y;
+		int hp;
+		int max_hp;
+		unsigned long long exp;
+		unsigned char level;
+	};
+
 	int playerID;
 	int mVisualId; // for future use (different visual appearances)
 	int mX;
@@ -34,6 +57,10 @@ private:
 	int mMaxHp;
 	unsigned long long mExp;
 	unsigned char mLevel;
-	std::unordered_map<int, Object> mViewList;
+	std::unordered_map<int, RenderObject> mRenderList;
+
+	// 이전 위치 추적 (위치 변경 시 서버에 알림)
+	int mLastSentX;
+	int mLastSentY;
 };
 
