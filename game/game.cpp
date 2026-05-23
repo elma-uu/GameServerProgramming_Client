@@ -32,19 +32,26 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 
 	// Network 초기화 및 서버 연결
 	mNetwork = new Network();
-	mNetwork->Connect("127.0.0.1", PORT);
+	if (mNetwork->Connect("127.0.0.1", PORT))
+	{
+		// 로그인 패킷 전송
+		C2S_Login loginPacket;
+		loginPacket.size = sizeof(C2S_Login);
+		loginPacket.type = C2S_LOGIN;
+		strcpy_s(loginPacket.username, MAX_NAME_LEN, "Player");
+		mNetwork->Send(&loginPacket);
+	}
 
-	// 카메라 초기화: 맵(2000x2000 타일), 타일 크기(50), 뷰(40x22 타일)
-	// 맵 총 크기: 2000*50 = 100,000 픽셀
-	mCamera.Initialize(2000, 2000, 50, 40, 22);
+	// 카메라 초기화: 맵(2000x2000 타일), 타일 크기(50), 뷰(16x12 타일 = 800x600 픽셀)
+	mCamera.Initialize(2000, 2000, 50, 16, 12);
 
 	// 맵 초기화: 2000x2000 타일, 타일 크기 50
 	mMap.Initialize(2000, 2000, 50);
 	// 미니맵 초기화: 2000x2000 타일, 타일 크기 50
 	mMiniMap.Initialize(2000, 2000, 50);
 
-	// 플레이어 초기 위치 설정 (월드 좌표, 타일 단위)
-	mAvatar.SetPosition(50000, 50000);
+	// 플레이어 초기 위치 설정 (월드 픽셀 좌표)
+	mAvatar.SetPosition(100000, 100000);
 }
 void Game::Run()
 {
@@ -58,6 +65,12 @@ void Game::Update()
 	Time::Update();
 	mAvatar.Update();
 	mCamera.Update();
+
+	// 서버로부터 패킷 수신 및 처리
+	if (mNetwork != nullptr)
+	{
+		mNetwork->ReceiveAndProcessPackets();
+	}
 }
 void Game::LateUpdate()
 {
@@ -87,15 +100,15 @@ void Game::clearRenderTarget()
 	// 검은 배경으로 채우기
 	HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));
 	HBRUSH oldBrush = (HBRUSH)SelectObject(mBackHdc, blackBrush);
-	Rectangle(mBackHdc, -1, -1, 1921, 1081);
+	Rectangle(mBackHdc, -1, -1, 801, 601);
 	SelectObject(mBackHdc, oldBrush);
 	DeleteObject(blackBrush);
 }
 
 void Game::copyRenderTarget(HDC source, HDC dest)
 {
-	// 백버퍼(source)를 화면(dest)에 복사 (1920x1080)
-	BitBlt(dest, 0, 0, 1920, 1080, source, 0, 0, SRCCOPY);
+	// 백버퍼(source)를 화면(dest)에 복사 (800x600)
+	BitBlt(dest, 0, 0, 800, 600, source, 0, 0, SRCCOPY);
 }
 
 void Game::adjustWindowRect(HWND hwnd, UINT width, UINT height)
@@ -115,8 +128,8 @@ void Game::adjustWindowRect(HWND hwnd, UINT width, UINT height)
 
 void Game::createBuffer(UINT width, UINT height)
 {
-	// 백버퍼 크기를 게임 해상도(1920x1080)로 설정
-	mBackBitmap = CreateCompatibleBitmap(mHdc, 1920, 1080);
+	// 백버퍼 크기를 게임 해상도(800x600)로 설정
+	mBackBitmap = CreateCompatibleBitmap(mHdc, 800, 600);
 
 	mBackHdc = CreateCompatibleDC(mHdc);
 

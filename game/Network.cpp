@@ -108,3 +108,19 @@ void Network::ProcessPacket(char* recv_packet)
 		break;
 	}
 }
+
+void Network::ReceiveAndProcessPackets()
+{
+	int receivedBytes = Receive(mBuf, MAX_BUF_SIZE);
+	if (receivedBytes > 0)
+	{
+		// 받은 데이터를 패킷 단위로 처리
+		// 첫 번째 바이트는 패킷 크기
+		int packetSize = static_cast<unsigned char>(mBuf[0]);
+
+		if (receivedBytes >= packetSize && packetSize > 0)
+		{
+			ProcessPacket(mBuf);
+		}
+	}
+}

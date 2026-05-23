@@ -8,8 +8,8 @@
 
 
 // 전역 변수:
-extern const UINT width = 1280;
-extern const UINT height = 720;
+extern const UINT width = 800;
+extern const UINT height = 600;
 
 HINSTANCE hInst;                                // 현재 인스턴스입니다.
 WCHAR szTitle[MAX_LOADSTRING];                  // 제목 표시줄 텍스트입니다.
@@ -89,17 +89,16 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hInst = hInstance; // 인스턴스 핸들을 전역 변수에 저장합니다.
 
-    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_POPUP,
-        0, 0, 1920, 1080, nullptr, nullptr, hInstance, nullptr);
-    GAME.Initialize(hWnd, 1920, 1080); // 애플리케이션 초기화
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+        100, 100, 800, 600, nullptr, nullptr, hInstance, nullptr);
+    GAME.Initialize(hWnd, 800, 600); // 애플리케이션 초기화
 
     if (!hWnd)
     {
         return FALSE;
     }
 
-    SetWindowPos(hWnd, HWND_TOP, 0, 0, 1920, 1080, SWP_FRAMECHANGED | SWP_NOOWNERZORDER | SWP_NOZORDER);
-    ShowWindow(hWnd, SW_MAXIMIZE);
+    ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
     // LoadScenes();
 

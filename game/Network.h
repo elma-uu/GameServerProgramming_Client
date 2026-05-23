@@ -21,6 +21,7 @@ public:
 	void Send(void* packet);
 	int Receive(char* buffer, int bufferSize);
 	void ProcessPacket(char* packet);
+	void ReceiveAndProcessPackets();  // 새로 추가: 패킷 수신 및 처리
 };
 
 
