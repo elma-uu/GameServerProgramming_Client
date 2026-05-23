@@ -33,6 +33,5 @@ private:
 	int mMaxHp;
 	unsigned long long mExp;
 	unsigned char mLevel;
-	std::unordered_map<int, Object> mViewList;
 };
 
