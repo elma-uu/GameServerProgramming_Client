@@ -1,8 +1,11 @@
 #pragma once
+#pragma once
+
+#include "protocol_2026.h"
 #include "WinSock2.h"
 #include "Windows.h"
-#include "protocol_2026.h"
-#include "Game.h"
+
+class Game;  // Forward declaration
 
 class Network
 {
@@ -19,4 +22,5 @@ public:
 	int Receive(char* buffer, int bufferSize);
 	void ProcessPacket(char* packet);
 };
+
 

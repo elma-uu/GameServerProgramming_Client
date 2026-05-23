@@ -8,6 +8,8 @@
 #include "Map.h"
 #include "MiniMap.h"
 
+class Network;  // Forward declaration
+
 class Game
 {
 public:
@@ -23,6 +25,7 @@ public:
 	HWND GetHwnd() { return mHwnd; }
 	Camera* GetCamera() { return &mCamera; }
 	Player* GetAvatar() { return &mAvatar; }
+	Network* GetNetwork() { return mNetwork; }
 
 private:
 	void clearRenderTarget();
@@ -45,6 +48,7 @@ private:
 	Player mAvatar;
 	Map mMap;
 	MiniMap mMiniMap;
+	Network* mNetwork;
 };
 
 

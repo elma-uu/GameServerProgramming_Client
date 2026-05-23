@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "Game.h"
 #include "Input.h"
+#include "Network.h"
 
 
 Game::Game()
@@ -10,19 +11,28 @@ Game::Game()
 	, mHeight(0)
 	, mBackHdc(NULL)
 	, mBackBitmap(NULL)
+	, mNetwork(nullptr)
 {
 
 }
 
 Game::~Game()
 {
-
+	if (mNetwork != nullptr)
+	{
+		delete mNetwork;
+		mNetwork = nullptr;
+	}
 }
 void Game::Initialize(HWND hwnd, UINT width, UINT height)
 {
 	adjustWindowRect(hwnd, width, height);
 	createBuffer(width, height);
 	initializeEtc();
+
+	// Network 초기화 및 서버 연결
+	mNetwork = new Network();
+	mNetwork->Connect("127.0.0.1", PORT);
 
 	// 카메라 초기화: 맵(2000x2000 타일), 타일 크기(50), 뷰(40x22 타일)
 	// 맵 총 크기: 2000*50 = 100,000 픽셀
@@ -34,7 +44,8 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 	mMiniMap.Initialize(2000, 2000, 50);
 
 	// 플레이어 초기 위치 설정 (월드 좌표, 타일 단위)
-	mAvatar.SetPosition(50000, 50000);
+	// 2000x2000 타일의 중앙 = 1000,1000
+	mAvatar.SetPosition(1000, 1000);
 }
 void Game::Run()
 {
@@ -118,4 +129,21 @@ void Game::initializeEtc()
 {
 	Input::Initialize();
 	Time::Initialize();
+}
+
+// 플레이어 이동 패킷을 서버에 전송하는 함수
+void SendPlayerMovePacket(int tileX, int tileY)
+{
+	Network* network = GAME.GetNetwork();
+	if (network != nullptr)
+	{
+		C2S_Move movePacket;
+		movePacket.size = sizeof(C2S_Move);
+		movePacket.type = C2S_MOVE;
+		movePacket.x = tileX;
+		movePacket.y = tileY;
+		movePacket.dir = UP;
+		movePacket.move_time = 0;
+		network->Send(&movePacket);
+	}
 }

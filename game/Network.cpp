@@ -1,5 +1,7 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include "Network.h"
+#include "Game.h"
+#include <string>
 
 Network::Network()
 {
@@ -17,16 +19,44 @@ Network::~Network()
 
 bool Network::Connect(const char* ip, int port)
 {
-	mServerAddr.sin_family = AF_INET;
-	mServerAddr.sin_port = htons(port);
-	mServerAddr.sin_addr.s_addr = inet_addr(ip);
+	// Winsock 초기화
+	WSADATA wsa_data;
+	int ret = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+	if (ret != 0)
+	{
+		OutputDebugString(L"WSAStartup Failed\n");
+		return false;
+	}
+
+	// 소켓 생성
 	mSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, 0);
 	if (mSocket == INVALID_SOCKET)
 	{
+		OutputDebugString(L"Socket Creation Failed\n");
 		return false;
 	}
+
+	// 서버 주소 설정
+	mServerAddr.sin_family = AF_INET;
+	mServerAddr.sin_port = htons(port);
+	mServerAddr.sin_addr.s_addr = inet_addr(ip);
+
+	// 서버에 연결
 	int result = WSAConnect(mSocket, (SOCKADDR*)&mServerAddr, sizeof(mServerAddr), NULL, NULL, NULL, NULL);
-	return result != SOCKET_ERROR;
+
+	if (result == SOCKET_ERROR)
+	{
+		int error = WSAGetLastError();
+		wchar_t error_msg[256];
+		swprintf_s(error_msg, L"WSAConnect Failed with error: %d\n", error);
+		OutputDebugString(error_msg);
+		closesocket(mSocket);
+		mSocket = INVALID_SOCKET;
+		return false;
+	}
+
+	OutputDebugString(L"Connected to Server Successfully!\n");
+	return true;
 }
 
 void Network::Send(void* packet)
@@ -70,13 +100,21 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_ADD_OBJECT:
 	{
 		S2C_AddObject* packet = reinterpret_cast<S2C_AddObject*>(recv_packet);
-		// 객체 추가 처리
+		GAME.GetAvatar()->AddObject(packet->object_id, std::string(packet->obj_name), 
+			packet->visual_id, packet->x, packet->y, packet->hp, packet->max_hp, 
+			packet->exp, packet->level);
 	}
 	break;
 	case S2C_REMOVE_OBJECT:
 	{
 		S2C_RemoveObject* packet = reinterpret_cast<S2C_RemoveObject*>(recv_packet);
-		// 객체 제거 처리
+		GAME.GetAvatar()->RemoveObject(packet->object_id);
+	}
+	break;
+	case S2C_MOVE_OBJECT:
+	{
+		S2C_MoveObject* packet = reinterpret_cast<S2C_MoveObject*>(recv_packet);
+		GAME.GetAvatar()->UpdateObjectPosition(packet->object_id, packet->x, packet->y);
 	}
 	break;
 	case S2C_CHAT_MESSAGE:
@@ -88,7 +126,8 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_STATUS_CHANGE:
 	{
 		S2C_StatusChange* packet = reinterpret_cast<S2C_StatusChange*>(recv_packet);
-		// 상태 변경 처리
+		GAME.GetAvatar()->UpdateObjectStatus(packet->object_id, packet->hp, packet->max_hp, 
+			packet->exp, packet->level);
 	}
 	break;
 
