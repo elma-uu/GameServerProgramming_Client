@@ -7,6 +7,10 @@ Network::Network()
 {
 	mSocket = INVALID_SOCKET;
 	ZeroMemory(&mServerAddr, sizeof(mServerAddr));
+
+	// WSAStartup 초기화
+	WSADATA wsaData;
+	WSAStartup(MAKEWORD(2, 2), &wsaData);
 }
 
 Network::~Network()
@@ -15,6 +19,7 @@ Network::~Network()
 	{
 		closesocket(mSocket);
 	}
+	WSACleanup();
 }
 
 bool Network::Connect(const char* ip, int port)
@@ -25,23 +30,40 @@ bool Network::Connect(const char* ip, int port)
 	mSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, 0);
 	if (mSocket == INVALID_SOCKET)
 	{
+		int error = WSAGetLastError();
+		printf("Socket creation failed: %d\n", error);
 		return false;
 	}
 	int result = WSAConnect(mSocket, (SOCKADDR*)&mServerAddr, sizeof(mServerAddr), NULL, NULL, NULL, NULL);
-	return result != SOCKET_ERROR;
+	if (result == SOCKET_ERROR)
+	{
+		int error = WSAGetLastError();
+		printf("Connection failed: %d\n", error);
+		return false;
+	}
+	printf("Connected to server successfully\n");
+	return true;
 }
 
 void Network::Send(void* packet)
 {
 	unsigned char* p = reinterpret_cast<unsigned char*>(packet);
+	unsigned char packetSize = *p;
 	DWORD sent = 0;
-	WSASend(mSocket, reinterpret_cast<WSABUF*>(&p), 1, &sent, 0, NULL, NULL);
+	WSABUF wsaBuf;
+	wsaBuf.buf = (char*)p;
+	wsaBuf.len = packetSize;
+	WSASend(mSocket, &wsaBuf, 1, &sent, 0, NULL, NULL);
 }
 
 int Network::Receive(char* buffer, int bufferSize)
 {
 	DWORD received = 0;
-	int result = WSARecv(mSocket, reinterpret_cast<WSABUF*>(&buffer), 1, &received, NULL, NULL, NULL);
+	DWORD flags = 0;
+	WSABUF wsaBuf;
+	wsaBuf.buf = buffer;
+	wsaBuf.len = bufferSize;
+	int result = WSARecv(mSocket, &wsaBuf, 1, &received, &flags, NULL, NULL);
 	return (result == SOCKET_ERROR) ? -1 : static_cast<int>(received);
 }
 
@@ -116,11 +138,19 @@ void Network::ReceiveAndProcessPackets()
 	{
 		// 받은 데이터를 패킷 단위로 처리
 		// 첫 번째 바이트는 패킷 크기
-		int packetSize = static_cast<unsigned char>(mBuf[0]);
-
-		if (receivedBytes >= packetSize && packetSize > 0)
+		int offset = 0;
+		while (offset < receivedBytes)
 		{
-			ProcessPacket(mBuf);
+			if (offset + 1 > receivedBytes)
+				break;
+
+			int packetSize = static_cast<unsigned char>(mBuf[offset]);
+
+			if (packetSize <= 0 || offset + packetSize > receivedBytes)
+				break;
+
+			ProcessPacket(&mBuf[offset]);
+			offset += packetSize;
 		}
 	}
 }

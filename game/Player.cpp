@@ -15,9 +15,9 @@ const int FRAME_MOVE = 2;      // 테스트: 프레임당 2픽셀 이동
 
 Player::Player()
 {
-    SetPosition(100000, 100000);  // 맵 중앙에 시작
-    mLastSentX = 100000;
-    mLastSentY = 100000;
+    SetPosition(50000, 50000);  // 맵 중앙에 시작 (타일: 1000, 1000)
+    mLastSentX = 50000;
+    mLastSentY = 50000;
 }
 
 Player::~Player()
@@ -44,8 +44,8 @@ void Player::Update()
         SetPosition(GetX(), GetY() + FRAME_MOVE);
     }
 
-    // 맵 범위 제한 (2000x2000 타일 = 200,000x200,000 픽셀)
-    const int MAP_MAX = 200000;
+    // 맵 범위 제한 (2000x2000 타일 = 100,000x100,000 픽셀)
+    const int MAP_MAX = 100000;
     int x = GetX();
     int y = GetY();
 
