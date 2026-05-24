@@ -41,6 +41,16 @@ bool Network::Connect(const char* ip, int port)
 		printf("Connection failed: %d\n", error);
 		return false;
 	}
+
+	// 소켓을 Non-blocking 모드로 설정
+	u_long mode = 1; // Non-blocking
+	if (ioctlsocket(mSocket, FIONBIO, &mode) == SOCKET_ERROR)
+	{
+		int error = WSAGetLastError();
+		printf("Failed to set non-blocking mode: %d\n", error);
+		return false;
+	}
+
 	printf("Connected to server successfully\n");
 	return true;
 }
@@ -137,6 +147,23 @@ void Network::ProcessPacket(char* recv_packet)
 void Network::ReceiveAndProcessPackets()
 {
 	int receivedBytes = Receive(mBuf, MAX_BUF_SIZE);
+
+	// Non-blocking 모드에서 WSAEWOULDBLOCK은 정상 (데이터 없음)
+	if (receivedBytes == -1)
+	{
+		int error = WSAGetLastError();
+		if (error == WSAEWOULDBLOCK)
+		{
+			// 받을 데이터가 없음 - 정상 상태
+			return;
+		}
+		else
+		{
+			printf("WSARecv error: %d\n", error);
+			return;
+		}
+	}
+
 	if (receivedBytes > 0)
 	{
 		// 받은 데이터를 패킷 단위로 처리
