@@ -98,8 +98,9 @@ void Network::ProcessPacket(char* recv_packet)
 	{
 		S2C_AvatarInfo* packet = reinterpret_cast<S2C_AvatarInfo*>(recv_packet);
 		// 서버에서 받은 타일 좌표(x, y)를 픽셀 좌표로 변환 (타일 크기: 50)
-		int pixelX = packet->x * 50;
-		int pixelY = packet->y * 50;
+		// 타일 기준: 타일 중심 = 타일번호 * 50 + 25
+		int pixelX = packet->x * 50 + 25;
+		int pixelY = packet->y * 50 + 25;
 		GAME.GetAvatar()
 			->SetPlayerInfo(packet->playerId, pixelX, pixelY, packet->hp, packet->max_hp, packet->exp, packet->level);
 		printf("Avatar info received - Tile: (%d, %d) -> Pixel: (%d, %d)\n", packet->x, packet->y, pixelX, pixelY);
@@ -109,8 +110,9 @@ void Network::ProcessPacket(char* recv_packet)
 	{
 		S2C_AddObject* packet = reinterpret_cast<S2C_AddObject*>(recv_packet);
 		// 서버에서 받은 타일 좌표(x, y)를 픽셀 좌표로 변환 (타일 크기: 50)
-		int pixelX = packet->x * 50;
-		int pixelY = packet->y * 50;
+		// 타일 기준: 타일 중심 = 타일번호 * 50 + 25
+		int pixelX = packet->x * 50 + 25;
+		int pixelY = packet->y * 50 + 25;
 		GAME.GetAvatar()->AddObject(packet->object_id, std::string(packet->obj_name), 
 			packet->visual_id, pixelX, pixelY, packet->hp, packet->max_hp, 
 			packet->exp, packet->level);
@@ -128,8 +130,9 @@ void Network::ProcessPacket(char* recv_packet)
 	{
 		S2C_MoveObject* packet = reinterpret_cast<S2C_MoveObject*>(recv_packet);
 		// 서버에서 받은 타일 좌표(x, y)를 픽셀 좌표로 변환 (타일 크기: 50)
-		int pixelX = packet->x * 50;
-		int pixelY = packet->y * 50;
+		// 타일 기준: 타일 중심 = 타일번호 * 50 + 25
+		int pixelX = packet->x * 50 + 25;
+		int pixelY = packet->y * 50 + 25;
 
 		// 플레이어 자신인 경우 SetPosition으로 직접 업데이트
 		if (packet->object_id == GAME.GetAvatar()->GetPlayerID())

@@ -15,9 +15,11 @@ const int FRAME_MOVE = 2;      // 테스트: 프레임당 2픽셀 이동
 
 Player::Player()
 {
-    SetPosition(50000, 50000);  // 맵 중앙에 시작 (타일: 1000, 1000)
-    mLastSentX = 50000;
-    mLastSentY = 50000;
+    // 맵 중앙에 시작 (타일: 1000, 1000 중심 = 픽셀 50025, 50025)
+    SetPosition(50025, 50025);
+    // mLastSentX/Y는 타일 좌표로 저장
+    mLastSentX = 1000;
+    mLastSentY = 1000;
     mLastDirection = UP;  // 기본 방향
 }
 
