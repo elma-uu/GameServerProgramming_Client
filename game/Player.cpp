@@ -18,6 +18,7 @@ Player::Player()
     SetPosition(50000, 50000);  // 맵 중앙에 시작 (타일: 1000, 1000)
     mLastSentX = 50000;
     mLastSentY = 50000;
+    mLastDirection = UP;  // 기본 방향
 }
 
 Player::~Player()
@@ -30,18 +31,22 @@ void Player::Update()
     if (Input::GetKey(eKeyCode::Left))
     {
         SetPosition(GetX() - FRAME_MOVE, GetY());
+        mLastDirection = LEFT;
     }
     if (Input::GetKey(eKeyCode::Right))
     {
         SetPosition(GetX() + FRAME_MOVE, GetY());
+        mLastDirection = RIGHT;
     }
     if (Input::GetKey(eKeyCode::Up))
     {
         SetPosition(GetX(), GetY() - FRAME_MOVE);
+        mLastDirection = UP;
     }
     if (Input::GetKey(eKeyCode::Down))
     {
         SetPosition(GetX(), GetY() + FRAME_MOVE);
+        mLastDirection = DOWN;
     }
 
     // 맵 범위 제한 (2000x2000 타일 = 100,000x100,000 픽셀)
@@ -68,7 +73,8 @@ void Player::LateUpdate()
     if (mLastSentX != currentTileX || mLastSentY != currentTileY)
     {
         // 위치가 변경되었으므로 서버에 이동 패킷 전송
-        // SendMoveToServer 메서드를 통해 전송 (Game.cpp에서 실제 전송)
+        printf("Tile changed - From: (%d, %d) -> To: (%d, %d), Pixel: (%d, %d)\n", 
+            mLastSentX, mLastSentY, currentTileX, currentTileY, GetX(), GetY());
         SendMoveToServer(currentTileX, currentTileY);
 
         mLastSentX = currentTileX;
@@ -106,9 +112,9 @@ void Player::AddObject(int objectId, const std::string& objName, int visualId,
     obj.object_id = objectId;
     obj.obj_name = objName;
     obj.visual_id = visualId;
-    // 서버에서 보내는 타일 좌표를 픽셀 좌표로 변환 (TILE_SIZE = 50)
-    obj.x = x * TILE_SIZE;
-    obj.y = y * TILE_SIZE;
+    // Network.cpp에서 이미 픽셀 좌표로 변환되어 전달됨
+    obj.x = x;
+    obj.y = y;
     obj.hp = hp;
     obj.max_hp = max_hp;
     obj.exp = exp;
@@ -131,9 +137,9 @@ void Player::UpdateObjectPosition(int objectId, int x, int y)
     auto it = mRenderList.find(objectId);
     if (it != mRenderList.end())
     {
-        // 서버에서 보내는 타일 좌표를 픽셀 좌표로 변환 (TILE_SIZE = 50)
-        it->second.x = x * TILE_SIZE;
-        it->second.y = y * TILE_SIZE;
+        // Network.cpp에서 이미 픽셀 좌표로 변환되어 전달됨
+        it->second.x = x;
+        it->second.y = y;
     }
 }
 

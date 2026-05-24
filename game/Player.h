@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Object.h"
+#include "protocol_2026.h"
 #include <string>
 
 class Player : public Object
@@ -35,6 +36,9 @@ public:
 	void RenderObjects(HDC hdc);
 	void SendMoveToServer(int tileX, int tileY);
 
+	int GetPlayerID() const { return playerID; }
+	DIRECTION GetLastDirection() const { return mLastDirection; }
+
 private:
 	struct RenderObject
 	{
@@ -62,5 +66,6 @@ private:
 	// 이전 위치 추적 (위치 변경 시 서버에 알림)
 	int mLastSentX;
 	int mLastSentY;
+	DIRECTION mLastDirection; // 마지막 이동 방향
 };
 

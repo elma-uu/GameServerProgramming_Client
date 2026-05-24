@@ -154,8 +154,9 @@ void SendPlayerMovePacket(int tileX, int tileY)
 		movePacket.type = C2S_MOVE;
 		movePacket.x = tileX;
 		movePacket.y = tileY;
-		movePacket.dir = UP;
+		movePacket.dir = GAME.GetAvatar()->GetLastDirection();  // 마지막 이동 방향 사용
 		movePacket.move_time = 0;
 		network->Send(&movePacket);
+		printf("Move packet sent to server - Tile: (%d, %d), Direction: %d\n", tileX, tileY, movePacket.dir);
 	}
 }
