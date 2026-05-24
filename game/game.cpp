@@ -50,8 +50,8 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 	// 미니맵 초기화: 2000x2000 타일, 타일 크기 50
 	mMiniMap.Initialize(2000, 2000, 50);
 
-	// 플레이어 초기 위치 설정 (월드 픽셀 좌표)
-	mAvatar.SetPosition(100000, 100000);
+	// 플레이어 초기 위치 설정 (타일 기준 좌표 1000, 1000 = 픽셀 50000, 50000)
+	mAvatar.SetPosition(50000, 50000);
 }
 void Game::Run()
 {

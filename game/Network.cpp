@@ -87,8 +87,11 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_AVATAR_INFO:
 	{
 		S2C_AvatarInfo* packet = reinterpret_cast<S2C_AvatarInfo*>(recv_packet);
+		// 서버에서 받은 타일 좌표(x, y)를 픽셀 좌표로 변환 (타일 크기: 50)
+		int pixelX = packet->x * 50;
+		int pixelY = packet->y * 50;
 		GAME.GetAvatar()
-			->SetPlayerInfo(packet->playerId, packet->x, packet->y, packet->hp, packet->max_hp, packet->exp, packet->level);
+			->SetPlayerInfo(packet->playerId, pixelX, pixelY, packet->hp, packet->max_hp, packet->exp, packet->level);
 	}
 	break;
 	case S2C_ADD_OBJECT:
