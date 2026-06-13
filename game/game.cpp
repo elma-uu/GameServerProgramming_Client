@@ -173,7 +173,17 @@ void Game::SendChatPacket(const std::string& msg)
 	mNetwork->Send(&chatPacket);
 }
 
-// 플레이어 이동 패킷을 서버로 전송하는 함수
+void SendStatInvest(STAT_TYPE st)
+{
+	Network* network = GAME.GetNetwork();
+	if (network == nullptr) return;
+	C2S_StatInvest packet;
+	packet.size = sizeof(C2S_StatInvest);
+	packet.type = C2S_STAT_INVEST;
+	packet.stat_type = st;
+	network->Send(&packet);
+}
+
 void SendPlayerMovePacket(int tileX, int tileY)
 {
 	Network* network = GAME.GetNetwork();

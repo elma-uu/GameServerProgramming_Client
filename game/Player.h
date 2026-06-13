@@ -40,6 +40,14 @@ public:
 	DIRECTION GetLastDirection() const { return mLastDirection; }
 	std::string GetObjectName(int objectId) const;
 
+	void SetStatInfo(unsigned char str, unsigned char intl,
+		unsigned char dex, unsigned char luk, unsigned char points)
+	{
+		mStr = str; mIntl = intl; mDex = dex; mLuk = luk; mStatPoints = points;
+	}
+	void RenderStats(HDC hdc);
+	void SendStatInvestPacket(STAT_TYPE statType);
+
 private:
 	struct RenderObject
 	{
@@ -62,6 +70,11 @@ private:
 	int mMaxHp;
 	unsigned long long mExp;
 	unsigned char mLevel;
+	unsigned char mStr;
+	unsigned char mIntl;
+	unsigned char mDex;
+	unsigned char mLuk;
+	unsigned char mStatPoints;
 	std::unordered_map<int, RenderObject> mRenderList;
 
 	// ���� ��ġ ���� (��ġ ���� �� ������ �˸�)

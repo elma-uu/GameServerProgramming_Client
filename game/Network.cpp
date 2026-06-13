@@ -171,8 +171,18 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_STATUS_CHANGE:
 	{
 		S2C_StatusChange* packet = reinterpret_cast<S2C_StatusChange*>(recv_packet);
-		GAME.GetAvatar()->UpdateObjectStatus(packet->object_id, packet->hp, packet->max_hp, 
+		GAME.GetAvatar()->UpdateObjectStatus(packet->object_id, packet->hp, packet->max_hp,
 			packet->exp, packet->level);
+	}
+	break;
+	case S2C_STAT_INFO:
+	{
+		S2C_StatInfo* packet = reinterpret_cast<S2C_StatInfo*>(recv_packet);
+		if (packet->object_id == GAME.GetAvatar()->GetPlayerID())
+		{
+			GAME.GetAvatar()->SetStatInfo(
+				packet->str, packet->intl, packet->dex, packet->luk, packet->stat_points);
+		}
 	}
 	break;
 

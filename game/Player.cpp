@@ -15,12 +15,12 @@ const int FRAME_MOVE = 2;      // �׽�Ʈ: �����Ӵ� 2�ȼ� �
 
 Player::Player()
 {
-    // �� �߾ӿ� ���� (Ÿ��: 1000, 1000 �߽� = �ȼ� 50025, 50025)
     SetPosition(50025, 50025);
-    // mLastSentX/Y�� Ÿ�� ��ǥ�� ����
     mLastSentX = 1000;
     mLastSentY = 1000;
-    mLastDirection = UP;  // �⺻ ����
+    mLastDirection = UP;
+    mStr = 5; mIntl = 5; mDex = 5; mLuk = 5;
+    mStatPoints = 0;
 }
 
 Player::~Player()
@@ -29,8 +29,17 @@ Player::~Player()
 
 void Player::Update()
 {
-    // block movement while in chat mode
+    // block movement and stat keys while in chat mode
     if (Input::IsChatMode()) return;
+
+    // stat investment: press 1-4 when stat points are available
+    if (mStatPoints > 0)
+    {
+        if (Input::GetKeyDown(eKeyCode::Key1)) SendStatInvestPacket(STAT_STR);
+        if (Input::GetKeyDown(eKeyCode::Key2)) SendStatInvestPacket(STAT_INT);
+        if (Input::GetKeyDown(eKeyCode::Key3)) SendStatInvestPacket(STAT_DEX);
+        if (Input::GetKeyDown(eKeyCode::Key4)) SendStatInvestPacket(STAT_LUK);
+    }
 
     if (Input::GetKey(eKeyCode::Left))
     {
@@ -105,8 +114,8 @@ void Player::Render(HDC hdc)
     SelectObject(hdc, oldBrush);
     DeleteObject(whiteBrush);
 
-    // ���� ����Ʈ�� ��� ��ü ������
     RenderObjects(hdc);
+    RenderStats(hdc);
 }
 
 void Player::AddObject(int objectId, const std::string& objName, int visualId,
@@ -200,10 +209,56 @@ std::string Player::GetObjectName(int objectId) const
     return "";
 }
 
+void Player::RenderStats(HDC hdc)
+{
+    const int PX = 600;
+    const int PY = 10;
+    const int PW = 195;
+    const int LH = 18;
+
+    int rows = mStatPoints > 0 ? 5 : 3;
+
+    HBRUSH bgBrush = CreateSolidBrush(RGB(20, 20, 20));
+    HPEN nullPen   = (HPEN)GetStockObject(NULL_PEN);
+    HBRUSH oldBr   = (HBRUSH)SelectObject(hdc, bgBrush);
+    HPEN oldPen    = (HPEN)SelectObject(hdc, nullPen);
+    Rectangle(hdc, PX - 2, PY - 2, PX + PW + 2, PY + rows * LH + 4);
+    SelectObject(hdc, oldBr);
+    SelectObject(hdc, oldPen);
+    DeleteObject(bgBrush);
+
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, RGB(200, 220, 255));
+
+    char buf[64];
+    sprintf_s(buf, "STR:%3d   INT:%3d", (int)mStr, (int)mIntl);
+    TextOutA(hdc, PX + 4, PY, buf, static_cast<int>(strlen(buf)));
+
+    sprintf_s(buf, "DEX:%3d   LUK:%3d", (int)mDex, (int)mLuk);
+    TextOutA(hdc, PX + 4, PY + LH, buf, static_cast<int>(strlen(buf)));
+
+    sprintf_s(buf, "Points: %d", (int)mStatPoints);
+    SetTextColor(hdc, mStatPoints > 0 ? RGB(255, 255, 80) : RGB(150, 150, 150));
+    TextOutA(hdc, PX + 4, PY + LH * 2, buf, static_cast<int>(strlen(buf)));
+
+    if (mStatPoints > 0)
+    {
+        SetTextColor(hdc, RGB(180, 255, 180));
+        const char* hint1 = "1:STR  2:INT";
+        const char* hint2 = "3:DEX  4:LUK";
+        TextOutA(hdc, PX + 4, PY + LH * 3, hint1, static_cast<int>(strlen(hint1)));
+        TextOutA(hdc, PX + 4, PY + LH * 4, hint2, static_cast<int>(strlen(hint2)));
+    }
+}
+
+void Player::SendStatInvestPacket(STAT_TYPE statType)
+{
+    extern void SendStatInvest(STAT_TYPE st);
+    SendStatInvest(statType);
+}
+
 void Player::SendMoveToServer(int tileX, int tileY)
 {
-    // Game Ŭ������ SendPlayerMove �޼��带 ȣ��
-    // (�̸� ���� WinSock2 �ߺ� include ������ ����)
     extern void SendPlayerMovePacket(int x, int y);
     SendPlayerMovePacket(tileX, tileY);
 }
