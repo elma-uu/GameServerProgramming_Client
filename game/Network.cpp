@@ -8,7 +8,7 @@ Network::Network()
 	mSocket = INVALID_SOCKET;
 	ZeroMemory(&mServerAddr, sizeof(mServerAddr));
 
-	// WSAStartup ÃÊ±âÈ­
+	// WSAStartup ï¿½Ê±ï¿½È­
 	WSADATA wsaData;
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
 }
@@ -42,7 +42,7 @@ bool Network::Connect(const char* ip, int port)
 		return false;
 	}
 
-	// ¼ÒÄÏÀ» Non-blocking ¸ðµå·Î ¼³Á¤
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Non-blocking ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	u_long mode = 1; // Non-blocking
 	if (ioctlsocket(mSocket, FIONBIO, &mode) == SOCKET_ERROR)
 	{
@@ -86,19 +86,19 @@ void Network::ProcessPacket(char* recv_packet)
 		S2C_LoginResult* packet = reinterpret_cast<S2C_LoginResult*>(recv_packet);
 		if (packet->success)
 		{
-			// ·Î±×ÀÎ ¼º°ø Ã³¸®
+			// ï¿½Î±ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
 		}
 		else
 		{
-			// ·Î±×ÀÎ ½ÇÆÐ Ã³¸®
+			// ï¿½Î±ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
 		}
 	}
 	break;
 	case S2C_AVATAR_INFO:
 	{
 		S2C_AvatarInfo* packet = reinterpret_cast<S2C_AvatarInfo*>(recv_packet);
-		// ¼­¹ö¿¡¼­ ¹ÞÀº Å¸ÀÏ ÁÂÇ¥(x, y)¸¦ ÇÈ¼¿ ÁÂÇ¥·Î º¯È¯ (Å¸ÀÏ Å©±â: 50)
-		// Å¸ÀÏ ±âÁØ: Å¸ÀÏ Áß½É = Å¸ÀÏ¹øÈ£ * 50 + 25
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½Ç¥(x, y)ï¿½ï¿½ ï¿½È¼ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½È¯ (Å¸ï¿½ï¿½ Å©ï¿½ï¿½: 50)
+		// Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: Å¸ï¿½ï¿½ ï¿½ß½ï¿½ = Å¸ï¿½Ï¹ï¿½È£ * 50 + 25
 		int pixelX = packet->x * 50 + 25;
 		int pixelY = packet->y * 50 + 25;
 		GAME.GetAvatar()
@@ -109,8 +109,8 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_ADD_OBJECT:
 	{
 		S2C_AddObject* packet = reinterpret_cast<S2C_AddObject*>(recv_packet);
-		// ¼­¹ö¿¡¼­ ¹ÞÀº Å¸ÀÏ ÁÂÇ¥(x, y)¸¦ ÇÈ¼¿ ÁÂÇ¥·Î º¯È¯ (Å¸ÀÏ Å©±â: 50)
-		// Å¸ÀÏ ±âÁØ: Å¸ÀÏ Áß½É = Å¸ÀÏ¹øÈ£ * 50 + 25
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½Ç¥(x, y)ï¿½ï¿½ ï¿½È¼ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½È¯ (Å¸ï¿½ï¿½ Å©ï¿½ï¿½: 50)
+		// Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: Å¸ï¿½ï¿½ ï¿½ß½ï¿½ = Å¸ï¿½Ï¹ï¿½È£ * 50 + 25
 		int pixelX = packet->x * 50 + 25;
 		int pixelY = packet->y * 50 + 25;
 		GAME.GetAvatar()->AddObject(packet->object_id, std::string(packet->obj_name), 
@@ -129,12 +129,12 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_MOVE_OBJECT:
 	{
 		S2C_MoveObject* packet = reinterpret_cast<S2C_MoveObject*>(recv_packet);
-		// ¼­¹ö¿¡¼­ ¹ÞÀº Å¸ÀÏ ÁÂÇ¥(x, y)¸¦ ÇÈ¼¿ ÁÂÇ¥·Î º¯È¯ (Å¸ÀÏ Å©±â: 50)
-		// Å¸ÀÏ ±âÁØ: Å¸ÀÏ Áß½É = Å¸ÀÏ¹øÈ£ * 50 + 25
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½Ç¥(x, y)ï¿½ï¿½ ï¿½È¼ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½È¯ (Å¸ï¿½ï¿½ Å©ï¿½ï¿½: 50)
+		// Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: Å¸ï¿½ï¿½ ï¿½ß½ï¿½ = Å¸ï¿½Ï¹ï¿½È£ * 50 + 25
 		int pixelX = packet->x * 50 + 25;
 		int pixelY = packet->y * 50 + 25;
 
-		// ÇÃ·¹ÀÌ¾î ÀÚ½ÅÀÎ °æ¿ì SetPositionÀ¸·Î Á÷Á¢ ¾÷µ¥ÀÌÆ®
+		// ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½Ú½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ SetPositionï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 		if (packet->object_id == GAME.GetAvatar()->GetPlayerID())
 		{
 			GAME.GetAvatar()->SetPosition(pixelX, pixelY);
@@ -142,7 +142,7 @@ void Network::ProcessPacket(char* recv_packet)
 		}
 		else
 		{
-			// ´Ù¸¥ °´Ã¼ÀÇ ÀÌµ¿Àº ·»´õ ¸®½ºÆ®¿¡¼­ ¾÷µ¥ÀÌÆ®
+			// ï¿½Ù¸ï¿½ ï¿½ï¿½Ã¼ï¿½ï¿½ ï¿½Ìµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 			GAME.GetAvatar()->UpdateObjectPosition(packet->object_id, pixelX, pixelY);
 			printf("Object moved - ID: %d, Tile: (%d, %d) -> Pixel: (%d, %d)\n", packet->object_id, packet->x, packet->y, pixelX, pixelY);
 		}
@@ -151,7 +151,21 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_CHAT_MESSAGE:
 	{
 		S2C_ChatMessage* packet = reinterpret_cast<S2C_ChatMessage*>(recv_packet);
-		// Ã¤ÆÃ ¸Þ½ÃÁö Ã³¸®
+
+		std::string senderName;
+		int myId = GAME.GetAvatar()->GetPlayerID();
+		if (packet->object_id == myId)
+		{
+			senderName = "Me";
+		}
+		else
+		{
+			senderName = GAME.GetAvatar()->GetObjectName(packet->object_id);
+			if (senderName.empty())
+				senderName = "Player" + std::to_string(packet->object_id);
+		}
+
+		GAME.GetChatSystem()->AddMessage(senderName, std::string(packet->message));
 	}
 	break;
 	case S2C_STATUS_CHANGE:
@@ -172,13 +186,13 @@ void Network::ReceiveAndProcessPackets()
 {
 	int receivedBytes = Receive(mBuf, MAX_BUF_SIZE);
 
-	// Non-blocking ¸ðµå¿¡¼­ WSAEWOULDBLOCKÀº Á¤»ó (µ¥ÀÌÅÍ ¾øÀ½)
+	// Non-blocking ï¿½ï¿½å¿¡ï¿½ï¿½ WSAEWOULDBLOCKï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	if (receivedBytes == -1)
 	{
 		int error = WSAGetLastError();
 		if (error == WSAEWOULDBLOCK)
 		{
-			// ¹ÞÀ» µ¥ÀÌÅÍ°¡ ¾øÀ½ - Á¤»ó »óÅÂ
+			// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Í°ï¿½ ï¿½ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			return;
 		}
 		else
@@ -190,8 +204,8 @@ void Network::ReceiveAndProcessPackets()
 
 	if (receivedBytes > 0)
 	{
-		// ¹ÞÀº µ¥ÀÌÅÍ¸¦ ÆÐÅ¶ ´ÜÀ§·Î Ã³¸®
-		// Ã¹ ¹øÂ° ¹ÙÀÌÆ®´Â ÆÐÅ¶ Å©±â
+		// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Í¸ï¿½ ï¿½ï¿½Å¶ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½
+		// Ã¹ ï¿½ï¿½Â° ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½Å¶ Å©ï¿½ï¿½
 		int offset = 0;
 		while (offset < receivedBytes)
 		{

@@ -38,6 +38,7 @@ public:
 
 	int GetPlayerID() const { return playerID; }
 	DIRECTION GetLastDirection() const { return mLastDirection; }
+	std::string GetObjectName(int objectId) const;
 
 private:
 	struct RenderObject
@@ -63,9 +64,9 @@ private:
 	unsigned char mLevel;
 	std::unordered_map<int, RenderObject> mRenderList;
 
-	// ÀÌÀü À§Ä¡ ÃßÀû (À§Ä¡ º¯°æ ½Ã ¼­¹ö¿¡ ¾Ë¸²)
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ë¸ï¿½)
 	int mLastSentX;
 	int mLastSentY;
-	DIRECTION mLastDirection; // ¸¶Áö¸· ÀÌµ¿ ¹æÇâ
+	DIRECTION mLastDirection; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ìµï¿½ ï¿½ï¿½ï¿½ï¿½
 };
 

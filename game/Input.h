@@ -41,9 +41,13 @@ public:
     static bool GetKeyUp(eKeyCode code) { return Keys[(UINT)code].state == eKeyState::Up; }
     static bool GetKey(eKeyCode code) { return Keys[(UINT)code].state == eKeyState::Pressed; }
     static Vector2 GetMousePosition() { return mMousePosition; }
-    static void ProcessChar(WPARAM wParam); // WM_CHAR ¸Þ½ÃÁö Ã³¸®
-    static std::wstring GetInputText() { return mInputText; } // ÀÔ·ÂµÈ ÅØ½ºÆ® ¹ÝÈ¯
-    static void ClearInputText() { mInputText.clear(); } // ÀÔ·Â ÅØ½ºÆ® ÃÊ±âÈ­
+    static void ProcessChar(WPARAM wParam); // WM_CHAR ë©”ì‹œì§€ ì²˜ë¦¬
+    static std::wstring GetInputText() { return mInputText; }
+    static void ClearInputText() { mInputText.clear(); }
+
+    static bool IsChatMode() { return mChatMode; }
+    static void SetChatMode(bool mode) { mChatMode = mode; }
+    static bool ConsumeChatSubmit();
 
 private:
     static void createKeys();
@@ -58,5 +62,7 @@ private:
 private:
     static std::vector<Key> Keys;
     static Vector2 mMousePosition;
-    static std::wstring mInputText; // ÀÔ·ÂµÈ ¹®ÀÚ¿­ ÀúÀå
+    static std::wstring mInputText;
+    static bool mChatMode;
+    static bool mChatSubmit;
 };

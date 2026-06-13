@@ -5,6 +5,8 @@
 std::vector<Input::Key> Input::Keys = {};
 Vector2 Input::mMousePosition = Vector2::One;
 std::wstring Input::mInputText;
+bool Input::mChatMode   = false;
+bool Input::mChatSubmit = false;
 
 int ASCII[(UINT)eKeyCode::End] =
 {
@@ -17,17 +19,49 @@ int ASCII[(UINT)eKeyCode::End] =
 
 void Input::ProcessChar(WPARAM wParam)
 {
+    if (wParam == 13) // Enter
+    {
+        if (!mChatMode)
+        {
+            mChatMode = true;
+            mInputText.clear();
+        }
+        else
+        {
+            mChatSubmit = true;
+        }
+        return;
+    }
+    if (wParam == 27) // Escape - cancel chat
+    {
+        if (mChatMode)
+        {
+            mChatMode = false;
+            mInputText.clear();
+        }
+        return;
+    }
+    if (!mChatMode) return;
+
     if (wParam == VK_BACK)
     {
         if (!mInputText.empty())
-        {
             mInputText.pop_back();
-        }
     }
-    else if (wParam >= 32 && wParam <= 126 && mInputText.length() < 20) // 아스키 문자 범위
+    else if (wParam >= 32 && wParam <= 126 && mInputText.length() < MAX_CHAT_MSG_LEN - 1)
     {
         mInputText += static_cast<wchar_t>(wParam);
     }
+}
+
+bool Input::ConsumeChatSubmit()
+{
+    if (mChatSubmit)
+    {
+        mChatSubmit = false;
+        return true;
+    }
+    return false;
 }
 
 void Input::Initialize()

@@ -7,6 +7,7 @@
 #include "Player.h"
 #include "Map.h"
 #include "MiniMap.h"
+#include "ChatSystem.h"
 
 class Network;  // Forward declaration
 
@@ -26,6 +27,8 @@ public:
 	Camera* GetCamera() { return &mCamera; }
 	Player* GetAvatar() { return &mAvatar; }
 	Network* GetNetwork() { return mNetwork; }
+	ChatSystem* GetChatSystem() { return &mChatSystem; }
+	void SendChatPacket(const std::string& msg);
 
 private:
 	void clearRenderTarget();
@@ -48,6 +51,7 @@ private:
 	Player mAvatar;
 	Map mMap;
 	MiniMap mMiniMap;
+	ChatSystem mChatSystem;
 	Network* mNetwork;
 };
 

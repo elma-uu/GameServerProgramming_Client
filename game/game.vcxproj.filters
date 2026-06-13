@@ -78,6 +78,9 @@
     <ClInclude Include="MiniMap.h">
       <Filter>Map</Filter>
     </ClInclude>
+    <ClInclude Include="ChatSystem.h">
+      <Filter>Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -112,6 +115,9 @@
     </ClCompile>
     <ClCompile Include="MiniMap.cpp">
       <Filter>Map</Filter>
+    </ClCompile>
+    <ClCompile Include="ChatSystem.cpp">
+      <Filter>Network</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

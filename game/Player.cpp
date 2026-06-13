@@ -5,22 +5,22 @@
 #include "Camera.h"
 #include "Time.h"
 
-// ÇÑ ÇÁ·¹ÀÓ´ç ÀÌµ¿ °Å¸® (Å×½ºÆ®¿ë)
-// 60FPS ±âÁØ: 200ÇÈ¼¿/ÃÊ ¡À 60fps = ¾à 3.33ÇÈ¼¿/ÇÁ·¹ÀÓ
+// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ó´ï¿½ ï¿½Ìµï¿½ ï¿½Å¸ï¿½ (ï¿½×½ï¿½Æ®ï¿½ï¿½)
+// 60FPS ï¿½ï¿½ï¿½ï¿½: 200ï¿½È¼ï¿½/ï¿½ï¿½ ï¿½ï¿½ 60fps = ï¿½ï¿½ 3.33ï¿½È¼ï¿½/ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 const int PLAYER_SIZE = 50;    // player sprite size
-const int TILE_SIZE = PLAYER_SIZE;  // ¸Ê ÇÑÄ­ Å©±â = ÇÃ·¹ÀÌ¾î Å©±â
-const float MOVE_TIME = 0.5f;  // 0.5ÃÊ¿¡ 1Ä­
-const int PLAYER_SPEED = (int)(TILE_SIZE / MOVE_TIME);  // 100 ÇÈ¼¿/ÃÊ
-const int FRAME_MOVE = 2;      // Å×½ºÆ®: ÇÁ·¹ÀÓ´ç 2ÇÈ¼¿ ÀÌµ¿
+const int TILE_SIZE = PLAYER_SIZE;  // ï¿½ï¿½ ï¿½ï¿½Ä­ Å©ï¿½ï¿½ = ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ Å©ï¿½ï¿½
+const float MOVE_TIME = 0.5f;  // 0.5ï¿½Ê¿ï¿½ 1Ä­
+const int PLAYER_SPEED = (int)(TILE_SIZE / MOVE_TIME);  // 100 ï¿½È¼ï¿½/ï¿½ï¿½
+const int FRAME_MOVE = 2;      // ï¿½×½ï¿½Æ®: ï¿½ï¿½ï¿½ï¿½ï¿½Ó´ï¿½ 2ï¿½È¼ï¿½ ï¿½Ìµï¿½
 
 Player::Player()
 {
-    // ¸Ê Áß¾Ó¿¡ ½ÃÀÛ (Å¸ÀÏ: 1000, 1000 Áß½É = ÇÈ¼¿ 50025, 50025)
+    // ï¿½ï¿½ ï¿½ß¾Ó¿ï¿½ ï¿½ï¿½ï¿½ï¿½ (Å¸ï¿½ï¿½: 1000, 1000 ï¿½ß½ï¿½ = ï¿½È¼ï¿½ 50025, 50025)
     SetPosition(50025, 50025);
-    // mLastSentX/Y´Â Å¸ÀÏ ÁÂÇ¥·Î ÀúÀå
+    // mLastSentX/Yï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     mLastSentX = 1000;
     mLastSentY = 1000;
-    mLastDirection = UP;  // ±âº» ¹æÇâ
+    mLastDirection = UP;  // ï¿½âº» ï¿½ï¿½ï¿½ï¿½
 }
 
 Player::~Player()
@@ -29,7 +29,9 @@ Player::~Player()
 
 void Player::Update()
 {
-    // È­»ìÇ¥ Å° ÀÔ·Â Ã³¸® - ÇÁ·¹ÀÓ´ç °íÁ¤ °Å¸® ÀÌµ¿
+    // block movement while in chat mode
+    if (Input::IsChatMode()) return;
+
     if (Input::GetKey(eKeyCode::Left))
     {
         SetPosition(GetX() - FRAME_MOVE, GetY());
@@ -51,7 +53,7 @@ void Player::Update()
         mLastDirection = DOWN;
     }
 
-    // ¸Ê ¹üÀ§ Á¦ÇÑ (2000x2000 Å¸ÀÏ = 100,000x100,000 ÇÈ¼¿)
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (2000x2000 Å¸ï¿½ï¿½ = 100,000x100,000 ï¿½È¼ï¿½)
     const int MAP_MAX = 100000;
     int x = GetX();
     int y = GetY();
@@ -65,16 +67,16 @@ void Player::Update()
 
 void Player::LateUpdate()
 {
-    // Ä«¸Þ¶ó¸¦ ÇÃ·¹ÀÌ¾î À§Ä¡·Î ¾÷µ¥ÀÌÆ®
+    // Ä«ï¿½Þ¶ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
     GAME.GetCamera()->SetTarget(GetX(), GetY());
 
-    // À§Ä¡ º¯°æ °¨Áö: ÇÈ¼¿ ÁÂÇ¥¸¦ Å¸ÀÏ ÁÂÇ¥·Î º¯È¯ÇÏ¿© ¼­¹ö¿¡ Àü¼Û
+    // ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½: ï¿½È¼ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½È¯ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     int currentTileX = GetX() / TILE_SIZE;
     int currentTileY = GetY() / TILE_SIZE;
 
     if (mLastSentX != currentTileX || mLastSentY != currentTileY)
     {
-        // À§Ä¡°¡ º¯°æµÇ¾úÀ¸¹Ç·Î ¼­¹ö¿¡ ÀÌµ¿ ÆÐÅ¶ Àü¼Û
+        // ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ìµï¿½ ï¿½ï¿½Å¶ ï¿½ï¿½ï¿½ï¿½
         printf("Tile changed - From: (%d, %d) -> To: (%d, %d), Pixel: (%d, %d)\n", 
             mLastSentX, mLastSentY, currentTileX, currentTileY, GetX(), GetY());
         SendMoveToServer(currentTileX, currentTileY);
@@ -90,7 +92,7 @@ void Player::Render(HDC hdc)
     int screenX, screenY;
     camera->WorldToScreen(GetX(), GetY(), screenX, screenY);
 
-    // ÇÃ·¹ÀÌ¾î¸¦ È­¸é¿¡ ±×¸®±â (»ç°¢Çü) - Èò»ö
+    // ï¿½Ã·ï¿½ï¿½Ì¾î¸¦ È­ï¿½é¿¡ ï¿½×¸ï¿½ï¿½ï¿½ (ï¿½ç°¢ï¿½ï¿½) - ï¿½ï¿½ï¿½
     HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
     HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, whiteBrush);
 
@@ -103,7 +105,7 @@ void Player::Render(HDC hdc)
     SelectObject(hdc, oldBrush);
     DeleteObject(whiteBrush);
 
-    // ·»´õ ¸®½ºÆ®ÀÇ ¸ðµç °´Ã¼ ·»´õ¸µ
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     RenderObjects(hdc);
 }
 
@@ -114,7 +116,7 @@ void Player::AddObject(int objectId, const std::string& objName, int visualId,
     obj.object_id = objectId;
     obj.obj_name = objName;
     obj.visual_id = visualId;
-    // Network.cpp¿¡¼­ ÀÌ¹Ì ÇÈ¼¿ ÁÂÇ¥·Î º¯È¯µÇ¾î Àü´ÞµÊ
+    // Network.cppï¿½ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ ï¿½È¼ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½È¯ï¿½Ç¾ï¿½ ï¿½ï¿½ï¿½Þµï¿½
     obj.x = x;
     obj.y = y;
     obj.hp = hp;
@@ -139,7 +141,7 @@ void Player::UpdateObjectPosition(int objectId, int x, int y)
     auto it = mRenderList.find(objectId);
     if (it != mRenderList.end())
     {
-        // Network.cpp¿¡¼­ ÀÌ¹Ì ÇÈ¼¿ ÁÂÇ¥·Î º¯È¯µÇ¾î Àü´ÞµÊ
+        // Network.cppï¿½ï¿½ï¿½ï¿½ ï¿½Ì¹ï¿½ ï¿½È¼ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ ï¿½ï¿½È¯ï¿½Ç¾ï¿½ ï¿½ï¿½ï¿½Þµï¿½
         it->second.x = x;
         it->second.y = y;
     }
@@ -167,7 +169,7 @@ void Player::RenderObjects(HDC hdc)
         int screenX, screenY;
         camera->WorldToScreen(obj.x, obj.y, screenX, screenY);
 
-        // °´Ã¼¸¦ È­¸é¿¡ ±×¸®±â (»ç°¢Çü) - ÆÄ¶õ»ö (ÇÃ·¹ÀÌ¾î¿Í ±¸ºÐ)
+        // ï¿½ï¿½Ã¼ï¿½ï¿½ È­ï¿½é¿¡ ï¿½×¸ï¿½ï¿½ï¿½ (ï¿½ç°¢ï¿½ï¿½) - ï¿½Ä¶ï¿½ï¿½ï¿½ (ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
         HBRUSH blueBrush = CreateSolidBrush(RGB(0, 0, 255));
         HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, blueBrush);
 
@@ -180,20 +182,28 @@ void Player::RenderObjects(HDC hdc)
         SelectObject(hdc, oldBrush);
         DeleteObject(blueBrush);
 
-        // °´Ã¼ ÀÌ¸§ Ãâ·Â (HP Á¤º¸ Æ÷ÇÔ)
+        // ï¿½ï¿½Ã¼ ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ (HP ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
         char statusText[64];
         sprintf_s(statusText, sizeof(statusText), "%s(HP:%d/%d)", 
             obj.obj_name.c_str(), obj.hp, obj.max_hp);
 
-        // ÅØ½ºÆ®¸¦ °´Ã¼ À§¿¡ Ãâ·Â
+        // ï¿½Ø½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
         TextOutA(hdc, screenX - 20, screenY - 30, statusText, strlen(statusText));
     }
 }
 
+std::string Player::GetObjectName(int objectId) const
+{
+    auto it = mRenderList.find(objectId);
+    if (it != mRenderList.end())
+        return it->second.obj_name;
+    return "";
+}
+
 void Player::SendMoveToServer(int tileX, int tileY)
 {
-    // Game Å¬·¡½ºÀÇ SendPlayerMove ¸Þ¼­µå¸¦ È£Ãâ
-    // (ÀÌ¸¦ ÅëÇØ WinSock2 Áßº¹ include ¹®Á¦¸¦ ÇÇÇÔ)
+    // Game Å¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ SendPlayerMove ï¿½Þ¼ï¿½ï¿½å¸¦ È£ï¿½ï¿½
+    // (ï¿½Ì¸ï¿½ ï¿½ï¿½ï¿½ï¿½ WinSock2 ï¿½ßºï¿½ include ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     extern void SendPlayerMovePacket(int x, int y);
     SendPlayerMovePacket(tileX, tileY);
 }

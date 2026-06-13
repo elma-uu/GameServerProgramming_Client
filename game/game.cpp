@@ -30,11 +30,11 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 	createBuffer(width, height);
 	initializeEtc();
 
-	// Network ÃÊ±âÈ­ ¹× ¼­¹ö ¿¬°á
+	// Network ï¿½Ê±ï¿½È­ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	mNetwork = new Network();
 	if (mNetwork->Connect("127.0.0.1", PORT))
 	{
-		// ·Î±×ÀÎ ÆÐÅ¶ Àü¼Û
+		// ï¿½Î±ï¿½ï¿½ï¿½ ï¿½ï¿½Å¶ ï¿½ï¿½ï¿½ï¿½
 		C2S_Login loginPacket;
 		loginPacket.size = sizeof(C2S_Login);
 		loginPacket.type = C2S_LOGIN;
@@ -42,15 +42,15 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 		mNetwork->Send(&loginPacket);
 	}
 
-	// Ä«¸Þ¶ó ÃÊ±âÈ­: ¸Ê(2000x2000 Å¸ÀÏ), Å¸ÀÏ Å©±â(50), ºä(16x12 Å¸ÀÏ = 800x600 ÇÈ¼¿)
+	// Ä«ï¿½Þ¶ï¿½ ï¿½Ê±ï¿½È­: ï¿½ï¿½(2000x2000 Å¸ï¿½ï¿½), Å¸ï¿½ï¿½ Å©ï¿½ï¿½(50), ï¿½ï¿½(16x12 Å¸ï¿½ï¿½ = 800x600 ï¿½È¼ï¿½)
 	mCamera.Initialize(2000, 2000, 50, 16, 12);
 
-	// ¸Ê ÃÊ±âÈ­: 2000x2000 Å¸ÀÏ, Å¸ÀÏ Å©±â 50
+	// ï¿½ï¿½ ï¿½Ê±ï¿½È­: 2000x2000 Å¸ï¿½ï¿½, Å¸ï¿½ï¿½ Å©ï¿½ï¿½ 50
 	mMap.Initialize(2000, 2000, 50);
-	// ¹Ì´Ï¸Ê ÃÊ±âÈ­: 2000x2000 Å¸ÀÏ, Å¸ÀÏ Å©±â 50
+	// ï¿½Ì´Ï¸ï¿½ ï¿½Ê±ï¿½È­: 2000x2000 Å¸ï¿½ï¿½, Å¸ï¿½ï¿½ Å©ï¿½ï¿½ 50
 	mMiniMap.Initialize(2000, 2000, 50);
 
-	// ÇÃ·¹ÀÌ¾î ÃÊ±â À§Ä¡ ¼³Á¤ (Å¸ÀÏ ±âÁØ ÁÂÇ¥ 1000, 1000 Áß½É = ÇÈ¼¿ 50025, 50025)
+	// ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½Ê±ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ (Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ 1000, 1000 ï¿½ß½ï¿½ = ï¿½È¼ï¿½ 50025, 50025)
 	mAvatar.SetPosition(50025, 50025);
 }
 void Game::Run()
@@ -66,11 +66,27 @@ void Game::Update()
 	mAvatar.Update();
 	mCamera.Update();
 
-	// ¼­¹ö·ÎºÎÅÍ ÆÐÅ¶ ¼ö½Å ¹× Ã³¸®
+	// receive and process packets from server
 	if (mNetwork != nullptr)
 	{
 		mNetwork->ReceiveAndProcessPackets();
 	}
+
+	// handle chat submit (Enter pressed while in chat mode)
+	if (Input::ConsumeChatSubmit())
+	{
+		std::wstring inputText = Input::GetInputText();
+		if (!inputText.empty())
+		{
+			std::string msg(inputText.begin(), inputText.end());
+			SendChatPacket(msg);
+		}
+		Input::ClearInputText();
+		Input::SetChatMode(false);
+		mChatSystem.SetChatMode(false);
+	}
+	// sync ChatSystem mode with Input mode
+	mChatSystem.SetChatMode(Input::IsChatMode());
 }
 void Game::LateUpdate()
 {
@@ -80,24 +96,27 @@ void Game::Render()
 {
 	clearRenderTarget();
 
-	// ¸Ê ±×¸®µå ·»´õ¸µ
+	// ï¿½ï¿½ ï¿½×¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	mMap.Render(mBackHdc);
 
-	// ÇÃ·¹ÀÌ¾î ·»´õ¸µ
+	// ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	mAvatar.Render(mBackHdc);
 
-	// ¹Ì´Ï¸Ê ·»´õ¸µ
+	// ï¿½Ì´Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	mMiniMap.Render(mBackHdc);
 
-	// FPS Ç¥½Ã
+	// FPS
 	Time::Render(mBackHdc);
+
+	// chat window (bottom-left)
+	mChatSystem.Render(mBackHdc, Input::GetInputText());
 
 	copyRenderTarget(mBackHdc, mHdc);
 }
 
 void Game::clearRenderTarget()
 {
-	// °ËÀº ¹è°æÀ¸·Î Ã¤¿ì±â
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã¤ï¿½ï¿½ï¿½
 	HBRUSH blackBrush = CreateSolidBrush(RGB(0, 0, 0));
 	HBRUSH oldBrush = (HBRUSH)SelectObject(mBackHdc, blackBrush);
 	Rectangle(mBackHdc, -1, -1, 801, 601);
@@ -107,7 +126,7 @@ void Game::clearRenderTarget()
 
 void Game::copyRenderTarget(HDC source, HDC dest)
 {
-	// ¹é¹öÆÛ(source)¸¦ È­¸é(dest)¿¡ º¹»ç (800x600)
+	// ï¿½ï¿½ï¿½ï¿½ï¿½(source)ï¿½ï¿½ È­ï¿½ï¿½(dest)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (800x600)
 	BitBlt(dest, 0, 0, 800, 600, source, 0, 0, SRCCOPY);
 }
 
@@ -128,7 +147,7 @@ void Game::adjustWindowRect(HWND hwnd, UINT width, UINT height)
 
 void Game::createBuffer(UINT width, UINT height)
 {
-	// ¹é¹öÆÛ Å©±â¸¦ °ÔÀÓ ÇØ»óµµ(800x600)·Î ¼³Á¤
+	// ï¿½ï¿½ï¿½ï¿½ï¿½ Å©ï¿½â¸¦ ï¿½ï¿½ï¿½ï¿½ ï¿½Ø»ï¿½(800x600)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	mBackBitmap = CreateCompatibleBitmap(mHdc, 800, 600);
 
 	mBackHdc = CreateCompatibleDC(mHdc);
@@ -143,7 +162,18 @@ void Game::initializeEtc()
 	Time::Initialize();
 }
 
-// ÇÃ·¹ÀÌ¾î ÀÌµ¿ ÆÐÅ¶À» ¼­¹ö¿¡ Àü¼ÛÇÏ´Â ÇÔ¼ö
+void Game::SendChatPacket(const std::string& msg)
+{
+	if (mNetwork == nullptr) return;
+	C2S_Chat chatPacket;
+	chatPacket.size = sizeof(C2S_Chat);
+	chatPacket.type = C2S_CHAT;
+	strncpy_s(chatPacket.message, msg.c_str(), MAX_CHAT_MSG_LEN - 1);
+	chatPacket.message[MAX_CHAT_MSG_LEN - 1] = '\0';
+	mNetwork->Send(&chatPacket);
+}
+
+// í”Œë ˆì´ì–´ ì´ë™ íŒ¨í‚·ì„ ì„œë²„ë¡œ ì „ì†¡í•˜ëŠ” í•¨ìˆ˜
 void SendPlayerMovePacket(int tileX, int tileY)
 {
 	Network* network = GAME.GetNetwork();
@@ -154,7 +184,7 @@ void SendPlayerMovePacket(int tileX, int tileY)
 		movePacket.type = C2S_MOVE;
 		movePacket.x = tileX;
 		movePacket.y = tileY;
-		movePacket.dir = GAME.GetAvatar()->GetLastDirection();  // ¸¶Áö¸· ÀÌµ¿ ¹æÇâ »ç¿ë
+		movePacket.dir = GAME.GetAvatar()->GetLastDirection();  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ìµï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
 		movePacket.move_time = 0;
 		network->Send(&movePacket);
 		printf("Move packet sent to server - Tile: (%d, %d), Direction: %d\n", tileX, tileY, movePacket.dir);
