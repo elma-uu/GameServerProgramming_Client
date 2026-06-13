@@ -84,13 +84,13 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_LOGIN_RESULT:
 	{
 		S2C_LoginResult* packet = reinterpret_cast<S2C_LoginResult*>(recv_packet);
-		if (packet->success)
+		if (packet->result == LOGIN_SUCCESS || packet->result == LOGIN_NEW_USER)
 		{
-			// �α��� ���� ó��
+			GAME.OnLoginSuccess();
 		}
 		else
 		{
-			// �α��� ���� ó��
+			GAME.SetLoginMessage(std::string(packet->message));
 		}
 	}
 	break;

@@ -5,8 +5,13 @@
 std::vector<Input::Key> Input::Keys = {};
 Vector2 Input::mMousePosition = Vector2::One;
 std::wstring Input::mInputText;
-bool Input::mChatMode   = false;
-bool Input::mChatSubmit = false;
+bool Input::mChatMode    = false;
+bool Input::mChatSubmit  = false;
+bool Input::mLoginMode   = false;
+bool Input::mLoginFocusId = true;
+std::wstring Input::mLoginId;
+std::wstring Input::mLoginPw;
+bool Input::mLoginSubmit = false;
 
 int ASCII[(UINT)eKeyCode::End] =
 {
@@ -20,6 +25,32 @@ int ASCII[(UINT)eKeyCode::End] =
 
 void Input::ProcessChar(WPARAM wParam)
 {
+    // Login screen input takes priority
+    if (mLoginMode)
+    {
+        if (wParam == 9) // Tab - switch between ID and PW fields
+        {
+            mLoginFocusId = !mLoginFocusId;
+            return;
+        }
+        if (wParam == 13) // Enter - submit
+        {
+            mLoginSubmit = true;
+            return;
+        }
+        std::wstring& field = mLoginFocusId ? mLoginId : mLoginPw;
+        if (wParam == VK_BACK)
+        {
+            if (!field.empty()) field.pop_back();
+        }
+        else if (wParam >= 32 && wParam <= 126 && field.length() < MAX_NAME_LEN - 1)
+        {
+            field += static_cast<wchar_t>(wParam);
+        }
+        return;
+    }
+
+    // Chat mode
     if (wParam == 13) // Enter
     {
         if (!mChatMode)
@@ -53,6 +84,26 @@ void Input::ProcessChar(WPARAM wParam)
     {
         mInputText += static_cast<wchar_t>(wParam);
     }
+}
+
+void Input::SetLoginMode(bool on)
+{
+    mLoginMode = on;
+    if (on)
+    {
+        mLoginFocusId = true;
+        mLoginSubmit  = false;
+    }
+}
+
+bool Input::ConsumeLoginSubmit()
+{
+    if (mLoginSubmit)
+    {
+        mLoginSubmit = false;
+        return true;
+    }
+    return false;
 }
 
 bool Input::ConsumeChatSubmit()

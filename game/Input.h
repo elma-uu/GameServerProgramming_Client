@@ -50,6 +50,14 @@ public:
     static void SetChatMode(bool mode) { mChatMode = mode; }
     static bool ConsumeChatSubmit();
 
+    // Login screen input
+    static void        SetLoginMode(bool on);
+    static bool        IsLoginMode()      { return mLoginMode; }
+    static bool        IsLoginFocusId()   { return mLoginFocusId; }
+    static std::wstring GetLoginId()      { return mLoginId; }
+    static std::wstring GetLoginPw()      { return mLoginPw; }
+    static bool        ConsumeLoginSubmit();
+
 private:
     static void createKeys();
     static void updateKeys();
@@ -66,4 +74,9 @@ private:
     static std::wstring mInputText;
     static bool mChatMode;
     static bool mChatSubmit;
+    static bool mLoginMode;
+    static bool mLoginFocusId;   // true = ID field active
+    static std::wstring mLoginId;
+    static std::wstring mLoginPw;
+    static bool mLoginSubmit;
 };
