@@ -21,6 +21,7 @@ Player::Player()
     mLastDirection = UP;
     mStr = 5; mIntl = 5; mDex = 5; mLuk = 5;
     mStatPoints = 0;
+    mAttackCooldown = 0.0f;
 }
 
 Player::~Player()
@@ -31,6 +32,17 @@ void Player::Update()
 {
     // block movement and stat keys while in chat mode
     if (Input::IsChatMode()) return;
+
+    // Attack cooldown countdown
+    if (mAttackCooldown > 0.0f)
+        mAttackCooldown -= Time::DeltaTime();
+
+    // Attack: press S, 0.5s cooldown
+    if (Input::GetKeyDown(eKeyCode::S) && mAttackCooldown <= 0.0f)
+    {
+        SendAttackPacket();
+        mAttackCooldown = 0.5f;
+    }
 
     // stat investment: press 1-4 when stat points are available
     if (mStatPoints > 0)
@@ -105,14 +117,22 @@ void Player::Render(HDC hdc)
     HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
     HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, whiteBrush);
 
-    Rectangle(hdc, 
-        screenX - PLAYER_SIZE / 2, 
+    Rectangle(hdc,
+        screenX - PLAYER_SIZE / 2,
         screenY - PLAYER_SIZE / 2,
-        screenX + PLAYER_SIZE / 2, 
+        screenX + PLAYER_SIZE / 2,
         screenY + PLAYER_SIZE / 2);
 
     SelectObject(hdc, oldBrush);
     DeleteObject(whiteBrush);
+
+    // Level at top-left corner of player rect
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, RGB(255, 255, 80));
+    char lvBuf[16];
+    sprintf_s(lvBuf, "Lv.%d", (int)mLevel);
+    TextOutA(hdc, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2,
+        lvBuf, static_cast<int>(strlen(lvBuf)));
 
     RenderObjects(hdc);
     RenderStats(hdc);
@@ -191,13 +211,21 @@ void Player::RenderObjects(HDC hdc)
         SelectObject(hdc, oldBrush);
         DeleteObject(blueBrush);
 
-        // ��ü �̸� ��� (HP ���� ����)
-        char statusText[64];
-        sprintf_s(statusText, sizeof(statusText), "%s(HP:%d/%d)", 
-            obj.obj_name.c_str(), obj.hp, obj.max_hp);
+        SetBkMode(hdc, TRANSPARENT);
 
-        // �ؽ�Ʈ�� ��ü ���� ���
-        TextOutA(hdc, screenX - 20, screenY - 30, statusText, strlen(statusText));
+        // Level at top-left corner of object rect
+        SetTextColor(hdc, RGB(255, 255, 80));
+        char lvText[16];
+        sprintf_s(lvText, sizeof(lvText), "Lv.%d", (int)obj.level);
+        TextOutA(hdc, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2,
+            lvText, static_cast<int>(strlen(lvText)));
+
+        // Name and HP above the object
+        SetTextColor(hdc, RGB(255, 255, 255));
+        char statusText[64];
+        sprintf_s(statusText, sizeof(statusText), "%s(HP:%d/%d)",
+            obj.obj_name.c_str(), obj.hp, obj.max_hp);
+        TextOutA(hdc, screenX - 20, screenY - 30, statusText, static_cast<int>(strlen(statusText)));
     }
 }
 
@@ -261,4 +289,10 @@ void Player::SendMoveToServer(int tileX, int tileY)
 {
     extern void SendPlayerMovePacket(int x, int y);
     SendPlayerMovePacket(tileX, tileY);
+}
+
+void Player::SendAttackPacket()
+{
+    extern void SendAttackToServer();
+    SendAttackToServer();
 }

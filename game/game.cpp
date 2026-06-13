@@ -184,6 +184,16 @@ void SendStatInvest(STAT_TYPE st)
 	network->Send(&packet);
 }
 
+void SendAttackToServer()
+{
+	Network* network = GAME.GetNetwork();
+	if (network == nullptr) return;
+	C2S_Attack packet;
+	packet.size = sizeof(C2S_Attack);
+	packet.type = C2S_ATTACK;
+	network->Send(&packet);
+}
+
 void SendPlayerMovePacket(int tileX, int tileY)
 {
 	Network* network = GAME.GetNetwork();
@@ -194,7 +204,7 @@ void SendPlayerMovePacket(int tileX, int tileY)
 		movePacket.type = C2S_MOVE;
 		movePacket.x = tileX;
 		movePacket.y = tileY;
-		movePacket.dir = GAME.GetAvatar()->GetLastDirection();  // ������ �̵� ���� ���
+		movePacket.dir = GAME.GetAvatar()->GetLastDirection();
 		movePacket.move_time = 0;
 		network->Send(&movePacket);
 		printf("Move packet sent to server - Tile: (%d, %d), Direction: %d\n", tileX, tileY, movePacket.dir);

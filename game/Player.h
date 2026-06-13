@@ -47,6 +47,7 @@ public:
 	}
 	void RenderStats(HDC hdc);
 	void SendStatInvestPacket(STAT_TYPE statType);
+	void SendAttackPacket();
 
 private:
 	struct RenderObject
@@ -80,6 +81,7 @@ private:
 	// ���� ��ġ ���� (��ġ ���� �� ������ �˸�)
 	int mLastSentX;
 	int mLastSentY;
-	DIRECTION mLastDirection; // ������ �̵� ����
+	DIRECTION mLastDirection;
+	float mAttackCooldown;
 };
 
