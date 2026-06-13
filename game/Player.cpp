@@ -22,6 +22,7 @@ Player::Player()
     mStr = 5; mIntl = 5; mDex = 5; mLuk = 5;
     mStatPoints = 0;
     mAttackCooldown = 0.0f;
+    mAoeCooldown = 0.0f;
 }
 
 Player::~Player()
@@ -36,12 +37,21 @@ void Player::Update()
     // Attack cooldown countdown
     if (mAttackCooldown > 0.0f)
         mAttackCooldown -= Time::DeltaTime();
+    if (mAoeCooldown > 0.0f)
+        mAoeCooldown -= Time::DeltaTime();
 
     // Attack: press S, 0.5s cooldown
     if (Input::GetKeyDown(eKeyCode::S) && mAttackCooldown <= 0.0f)
     {
         SendAttackPacket();
         mAttackCooldown = 0.5f;
+    }
+
+    // AoE Attack: press A, 3s cooldown
+    if (Input::GetKeyDown(eKeyCode::A) && mAoeCooldown <= 0.0f)
+    {
+        SendAoeAttackPacket();
+        mAoeCooldown = 3.0f;
     }
 
     // stat investment: press 1-4 when stat points are available
@@ -289,6 +299,12 @@ void Player::SendMoveToServer(int tileX, int tileY)
 {
     extern void SendPlayerMovePacket(int x, int y);
     SendPlayerMovePacket(tileX, tileY);
+}
+
+void Player::SendAoeAttackPacket()
+{
+    extern void SendAoeAttackToServer();
+    SendAoeAttackToServer();
 }
 
 void Player::SendAttackPacket()

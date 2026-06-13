@@ -293,6 +293,16 @@ void SendAttackToServer()
 	network->Send(&packet);
 }
 
+void SendAoeAttackToServer()
+{
+	Network* network = GAME.GetNetwork();
+	if (network == nullptr) return;
+	C2S_AoeAttack packet;
+	packet.size = sizeof(C2S_AoeAttack);
+	packet.type = C2S_AOE_ATTACK;
+	network->Send(&packet);
+}
+
 void SendPlayerMovePacket(int tileX, int tileY)
 {
 	Network* network = GAME.GetNetwork();
