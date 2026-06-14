@@ -186,6 +186,18 @@ void Network::ProcessPacket(char* recv_packet)
 	}
 	break;
 
+	case S2C_PARTY_UPDATE:
+	{
+		S2C_PartyUpdate* pkt = reinterpret_cast<S2C_PartyUpdate*>(recv_packet);
+		GAME.GetAvatar()->OnPartyUpdate(pkt->party_id, (int)pkt->member_count, pkt->members);
+	}
+	break;
+	case S2C_PARTY_LIST:
+	{
+		S2C_PartyList* pkt = reinterpret_cast<S2C_PartyList*>(recv_packet);
+		GAME.GetAvatar()->OnPartyList((int)pkt->party_count, pkt->entries);
+	}
+	break;
 	default:
 		// Unknown Packet Type
 		break;

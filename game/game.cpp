@@ -194,6 +194,7 @@ void SendStatInvest(STAT_TYPE st)
 void Game::SendLoginPacket(const std::string& id, const std::string& pw)
 {
 	if (mNetwork == nullptr) return;
+	mAvatar.SetMyUsername(id);
 	C2S_Login packet;
 	packet.size = sizeof(C2S_Login);
 	packet.type = C2S_LOGIN;
@@ -318,4 +319,45 @@ void SendPlayerMovePacket(int tileX, int tileY)
 		network->Send(&movePacket);
 		printf("Move packet sent to server - Tile: (%d, %d), Direction: %d\n", tileX, tileY, movePacket.dir);
 	}
+}
+
+void SendPartyCreateToServer()
+{
+	Network* network = GAME.GetNetwork();
+	if (network == nullptr) return;
+	C2S_PartyCreate pkt;
+	pkt.size = sizeof(C2S_PartyCreate);
+	pkt.type = C2S_PARTY_CREATE;
+	network->Send(&pkt);
+}
+
+void SendPartyJoinToServer(int partyId)
+{
+	Network* network = GAME.GetNetwork();
+	if (network == nullptr) return;
+	C2S_PartyJoin pkt;
+	pkt.size = sizeof(C2S_PartyJoin);
+	pkt.type = C2S_PARTY_JOIN;
+	pkt.party_id = partyId;
+	network->Send(&pkt);
+}
+
+void SendPartyLeaveToServer()
+{
+	Network* network = GAME.GetNetwork();
+	if (network == nullptr) return;
+	C2S_PartyLeave pkt;
+	pkt.size = sizeof(C2S_PartyLeave);
+	pkt.type = C2S_PARTY_LEAVE;
+	network->Send(&pkt);
+}
+
+void SendPartyListReqToServer()
+{
+	Network* network = GAME.GetNetwork();
+	if (network == nullptr) return;
+	C2S_PartyListReq pkt;
+	pkt.size = sizeof(C2S_PartyListReq);
+	pkt.type = C2S_PARTY_LIST_REQ;
+	network->Send(&pkt);
 }

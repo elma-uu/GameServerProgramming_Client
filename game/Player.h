@@ -50,6 +50,17 @@ public:
 	void SendAttackPacket();
 	void SendAoeAttackPacket();
 
+	// Party
+	void SetMyUsername(const std::string& name) { mMyUsername = name; }
+	void OnPartyUpdate(int partyId, int memberCount, PartyMemberInfo* members);
+	void OnPartyList(int count, PartyListEntry* entries);
+	void RenderPartyPanel(HDC hdc);
+	void RenderPartyUI(HDC hdc);
+	void SendPartyCreate();
+	void SendPartyJoin(int partyId);
+	void SendPartyLeave();
+	void SendPartyListReq();
+
 private:
 	struct RenderObject
 	{
@@ -62,6 +73,22 @@ private:
 		int max_hp;
 		unsigned long long exp;
 		unsigned char level;
+	};
+
+	struct PartyMember
+	{
+		int   player_id;
+		char  name[MAX_NAME_LEN];
+		int   hp;
+		int   max_hp;
+		unsigned char level;
+	};
+
+	struct PartyUIEntry
+	{
+		int   party_id;
+		char  leader_name[MAX_NAME_LEN];
+		unsigned char member_count;
 	};
 
 	int playerID;
@@ -85,5 +112,13 @@ private:
 	DIRECTION mLastDirection;
 	float mAttackCooldown;
 	float mAoeCooldown;
+
+	// Party state
+	int                      mPartyId;
+	std::vector<PartyMember> mPartyMembers;
+	bool                     mShowPartyUI;
+	int                      mPartyUISelection;
+	std::vector<PartyUIEntry> mPartyList;
+	std::string              mMyUsername;
 };
 
