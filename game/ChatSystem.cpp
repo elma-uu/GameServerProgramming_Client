@@ -1,4 +1,5 @@
 #include "ChatSystem.h"
+#pragma comment(lib, "Msimg32.lib")
 
 ChatSystem::ChatSystem() : mChatMode(false) {}
 
@@ -15,15 +16,32 @@ void ChatSystem::Render(HDC hdc, const std::wstring& inputText)
         ? (INPUT_Y + LINE_HEIGHT + 4)
         : (MSG_START_Y + MAX_MESSAGES * LINE_HEIGHT + 2);
 
-    // chat background
-    HBRUSH bgBrush  = CreateSolidBrush(RGB(20, 20, 20));
-    HPEN   nullPen  = (HPEN)GetStockObject(NULL_PEN);
-    HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, bgBrush);
-    HPEN   oldPen   = (HPEN)SelectObject(hdc, nullPen);
-    Rectangle(hdc, CHAT_X - 1, MSG_START_Y - 1, CHAT_X + CHAT_WIDTH + 1, bgBottom);
-    SelectObject(hdc, oldBrush);
-    SelectObject(hdc, oldPen);
-    DeleteObject(bgBrush);
+    // Semi-transparent chat background via AlphaBlend
+    {
+        int bgX = CHAT_X - 1;
+        int bgY = MSG_START_Y - 1;
+        int bgW = CHAT_WIDTH + 2;
+        int bgH = bgBottom - bgY;
+
+        HDC    memDC  = CreateCompatibleDC(hdc);
+        HBITMAP memBmp = CreateCompatibleBitmap(hdc, bgW, bgH);
+        HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, memBmp);
+
+        HBRUSH fill = CreateSolidBrush(RGB(10, 10, 25));
+        RECT   rc   = { 0, 0, bgW, bgH };
+        FillRect(memDC, &rc, fill);
+        DeleteObject(fill);
+
+        BLENDFUNCTION bf = {};
+        bf.BlendOp             = AC_SRC_OVER;
+        bf.SourceConstantAlpha = 160;  // ~63% opaque
+        bf.AlphaFormat         = 0;
+        AlphaBlend(hdc, bgX, bgY, bgW, bgH, memDC, 0, 0, bgW, bgH, bf);
+
+        SelectObject(memDC, oldBmp);
+        DeleteObject(memBmp);
+        DeleteDC(memDC);
+    }
 
     // render messages
     SetTextColor(hdc, RGB(255, 255, 255));

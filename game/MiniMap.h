@@ -12,20 +12,19 @@ public:
     void Render(HDC hdc);
 
 private:
-    // ¹Ì´Ï¸Ê À§Ä¡ ¹× Å©±â
-    static const int MINIMAP_WIDTH = 150;
+    static const int MINIMAP_WIDTH  = 150;
     static const int MINIMAP_HEIGHT = 150;
-    static const int MINIMAP_X = 10;
-    static const int MINIMAP_Y = 10;
+    static const int MINIMAP_X = 800 - MINIMAP_WIDTH  - 10;  // 640  (right side)
+    static const int MINIMAP_Y = 600 - MINIMAP_HEIGHT - 10;  // 440  (bottom)
 
-    // ¸Ê Á¤º¸
+    // ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     int mMapTilesX;
     int mMapTilesY;
     int mTileSize;
     int mMapWidthPixel;
     int mMapHeightPixel;
 
-    // ¹Ì´Ï¸Ê ½ºÄÉÀÏ
+    // ï¿½Ì´Ï¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     float mScaleX;
     float mScaleY;
 };

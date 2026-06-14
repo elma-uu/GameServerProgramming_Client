@@ -6,17 +6,22 @@
 #include "Time.h"
 #include "SpriteManager.h"
 #include <cmath>
+#include <algorithm>
+
+// Forward declaration — defined later in this file
+static void DrawHpBar(HDC hdc, int cx, int top, int hp, int maxHp);
 
 // �� �����Ӵ� �̵� �Ÿ� (�׽�Ʈ��)
 // 60FPS ����: 200�ȼ�/�� �� 60fps = �� 3.33�ȼ�/������
 const int PLAYER_SIZE = 50;    // player sprite size
 const int TILE_SIZE = PLAYER_SIZE;  // �� ��ĭ ũ�� = �÷��̾� ũ��
-const float MOVE_TIME = 0.5f;  // 0.5�ʿ� 1ĭ
-const int PLAYER_SPEED = (int)(TILE_SIZE / MOVE_TIME);  // 100 �ȼ�/��
+const float MOVE_TIME = 0.25f; // 0.25s per tile = 4 tiles/s
+const int PLAYER_SPEED = (int)(TILE_SIZE / MOVE_TIME);  // 200 px/s
 const int FRAME_MOVE = 2;      // �׽�Ʈ: �����Ӵ� 2�ȼ� �̵�
 
 Player::Player()
 {
+    playerID  = -1;
     SetPosition(50025, 50025);
     mLastSentX = 1000;
     mLastSentY = 1000;
@@ -33,6 +38,8 @@ Player::Player()
     mAnimTimer  = 0.0f;
     mFacingLeft = false;
     mIsMoving   = false;
+    mMoveAccum        = 0.0f;
+    // mAvatarPositionSet = false;
 }
 
 Player::~Player()
@@ -111,25 +118,24 @@ void Player::Update()
         if (Input::GetKeyDown(eKeyCode::Key4)) SendStatInvestPacket(STAT_LUK);
     }
 
-    if (Input::GetKey(eKeyCode::Left))
-    {
-        SetPosition(GetX() - FRAME_MOVE, GetY());
-        mLastDirection = LEFT;
-    }
-    if (Input::GetKey(eKeyCode::Right))
-    {
-        SetPosition(GetX() + FRAME_MOVE, GetY());
-        mLastDirection = RIGHT;
-    }
-    if (Input::GetKey(eKeyCode::Up))
-    {
-        SetPosition(GetX(), GetY() - FRAME_MOVE);
-        mLastDirection = UP;
-    }
-    if (Input::GetKey(eKeyCode::Down))
-    {
-        SetPosition(GetX(), GetY() + FRAME_MOVE);
-        mLastDirection = DOWN;
+    float dt = Time::DeltaTime();
+
+    // 4 tiles/s = 200 px/s (TILE_SIZE=50)
+    // Accumulate fractional pixels so speed is frame-rate independent
+    bool anyMove = Input::GetKey(eKeyCode::Left)  || Input::GetKey(eKeyCode::Right) ||
+                   Input::GetKey(eKeyCode::Up)     || Input::GetKey(eKeyCode::Down);
+    if (anyMove) {
+        mMoveAccum += PLAYER_SPEED * dt;
+        int px = (int)mMoveAccum;
+        mMoveAccum -= (float)px;
+        if (px > 0) {
+            if (Input::GetKey(eKeyCode::Left))  { SetPosition(GetX() - px, GetY()); mLastDirection = LEFT; }
+            if (Input::GetKey(eKeyCode::Right)) { SetPosition(GetX() + px, GetY()); mLastDirection = RIGHT; }
+            if (Input::GetKey(eKeyCode::Up))    { SetPosition(GetX(), GetY() - px); mLastDirection = UP; }
+            if (Input::GetKey(eKeyCode::Down))  { SetPosition(GetX(), GetY() + px); mLastDirection = DOWN; }
+        }
+    } else {
+        mMoveAccum = 0.0f;
     }
 
     // Map boundary clamp (2000x2000 tiles = 100,000x100,000 pixels)
@@ -152,15 +158,24 @@ void Player::Update()
     if (Input::GetKey(eKeyCode::Right)) mFacingLeft = false;
 
     int numFrames = mIsMoving ? SPRITE_RUN_FRAMES : SPRITE_IDLE_FRAMES;
-    mAnimTimer += Time::DeltaTime();
+    mAnimTimer += dt;
     if (mAnimTimer >= 0.1f) {
         mAnimTimer = 0.0f;
         mAnimFrame = (mAnimFrame + 1) % numFrames;
     }
 
+    // Tick damage numbers
+    for (auto& dn : mDamageNumbers) {
+        dn.timeLeft -= dt;
+        dn.offsetY  -= 28.0f * dt;  // drift upward
+    }
+    mDamageNumbers.erase(
+        std::remove_if(mDamageNumbers.begin(), mDamageNumbers.end(),
+            [](const DamageNumber& d) { return d.timeLeft <= 0.0f; }),
+        mDamageNumbers.end());
+
     // Smooth interpolation for render objects (monsters & other players)
     const float MOVE_SPEED = 100.0f; // pixels per second (one tile = 50px, arrives in 0.5s)
-    float dt = Time::DeltaTime();
     for (auto& [id, obj] : mRenderList) {
         if (!obj.isMoving) continue;
         float dx   = obj.targetX - obj.x;
@@ -213,21 +228,63 @@ void Player::Render(HDC hdc)
 
     SetBkMode(hdc, TRANSPARENT);
 
-    // Username above the player rect
+    // HP bar - top left corner
+    {
+        const int BAR_X = 10, BAR_Y = 10, BAR_W = 200, BAR_H = 16;
+        int hp = GetHp(), maxHp = (mMaxHp > 0 ? mMaxHp : 1);
+        int fillW = BAR_W * max(0, hp) / maxHp;
+
+        HPEN nullPen = (HPEN)GetStockObject(NULL_PEN);
+        HBRUSH barBg = CreateSolidBrush(RGB(50, 10, 10));
+        HBRUSH barFg = CreateSolidBrush(RGB(210, 40, 40));
+        HPEN   barPen = CreatePen(PS_SOLID, 1, RGB(120, 120, 120));
+
+        // background
+        HBRUSH ob = (HBRUSH)SelectObject(hdc, barBg);
+        HPEN   op = (HPEN)SelectObject(hdc, nullPen);
+        Rectangle(hdc, BAR_X, BAR_Y, BAR_X + BAR_W, BAR_Y + BAR_H);
+
+        // fill
+        if (fillW > 0) {
+            SelectObject(hdc, barFg);
+            Rectangle(hdc, BAR_X, BAR_Y, BAR_X + fillW, BAR_Y + BAR_H);
+        }
+
+        // border
+        SelectObject(hdc, barPen);
+        SelectObject(hdc, GetStockObject(NULL_BRUSH));
+        Rectangle(hdc, BAR_X, BAR_Y, BAR_X + BAR_W, BAR_Y + BAR_H);
+
+        SelectObject(hdc, ob); SelectObject(hdc, op);
+        DeleteObject(barBg); DeleteObject(barFg); DeleteObject(barPen);
+
+        // HP text centered on bar
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, RGB(255, 255, 255));
+        char hpBuf[32];
+        sprintf_s(hpBuf, "HP  %d / %d", hp, maxHp);
+        TextOutA(hdc, BAR_X + 4, BAR_Y + 1, hpBuf, (int)strlen(hpBuf));
+    }
+
+    // Username above head
     if (!mMyUsername.empty()) {
         SetTextColor(hdc, RGB(255, 255, 255));
         TextOutA(hdc,
             screenX - (int)(mMyUsername.size() * 4),
-            screenY - PLAYER_SIZE / 2 - 16,
+            screenY - PLAYER_SIZE / 2 - 15,
             mMyUsername.c_str(), (int)mMyUsername.size());
     }
 
-    // Level at top-left corner of player rect
-    SetTextColor(hdc, RGB(255, 255, 80));
-    char lvBuf[16];
-    sprintf_s(lvBuf, "Lv.%d", (int)mLevel);
-    TextOutA(hdc, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2,
-        lvBuf, static_cast<int>(strlen(lvBuf)));
+    // Level text + HP bar below feet
+    {
+        const int footY = screenY + PLAYER_SIZE / 2 + 2;
+        SetTextColor(hdc, RGB(255, 255, 80));
+        char lvBuf[16];
+        sprintf_s(lvBuf, "Lv.%d", (int)mLevel);
+        TextOutA(hdc, screenX - (int)(strlen(lvBuf) * 4), footY,
+            lvBuf, static_cast<int>(strlen(lvBuf)));
+        DrawHpBar(hdc, screenX, footY + 14, GetHp(), mMaxHp > 0 ? mMaxHp : 1);
+    }
 
     RenderObjects(hdc);
     RenderStats(hdc);
@@ -277,6 +334,15 @@ void Player::UpdateObjectPosition(int objectId, int x, int y)
 
 void Player::UpdateObjectStatus(int objectId, int hp, int max_hp, unsigned long long exp, unsigned char level)
 {
+    // Update self HP/level when server sends our own status change
+    if (objectId == playerID) {
+        SetHp(hp);
+        mMaxHp  = max_hp;
+        mExp    = exp;
+        mLevel  = level;
+        return;
+    }
+
     auto it = mRenderList.find(objectId);
     if (it != mRenderList.end())
     {
@@ -296,9 +362,43 @@ void Player::UpdateObjectStatus(int objectId, int hp, int max_hp, unsigned long 
     }
 }
 
+// Draw a small HP bar above the given screen position.
+static void DrawHpBar(HDC hdc, int cx, int top, int hp, int maxHp)
+{
+    const int BAR_W = 46, BAR_H = 5;
+    int x = cx - BAR_W / 2;
+    int y = top;
+    int fillW = (maxHp > 0) ? (BAR_W * max(0, hp) / maxHp) : 0;
+
+    // background
+    HPEN   nullPen = (HPEN)GetStockObject(NULL_PEN);
+    HBRUSH barBg   = CreateSolidBrush(RGB(50, 10, 10));
+    HBRUSH ob = (HBRUSH)SelectObject(hdc, barBg);
+    HPEN   op = (HPEN)SelectObject(hdc, nullPen);
+    Rectangle(hdc, x, y, x + BAR_W, y + BAR_H);
+
+    // fill
+    if (fillW > 0) {
+        HBRUSH barFg = CreateSolidBrush(RGB(50, 200, 50));
+        SelectObject(hdc, barFg);
+        Rectangle(hdc, x, y, x + fillW, y + BAR_H);
+        DeleteObject(barFg);
+    }
+
+    // border
+    HPEN borderPen = CreatePen(PS_SOLID, 1, RGB(100, 100, 100));
+    SelectObject(hdc, borderPen);
+    SelectObject(hdc, GetStockObject(NULL_BRUSH));
+    Rectangle(hdc, x, y, x + BAR_W, y + BAR_H);
+
+    SelectObject(hdc, ob); SelectObject(hdc, op);
+    DeleteObject(barBg); DeleteObject(borderPen);
+}
+
 void Player::RenderObjects(HDC hdc)
 {
     Camera* camera = GAME.GetCamera();
+    SetBkMode(hdc, TRANSPARENT);
 
     for (auto& pair : mRenderList)
     {
@@ -306,34 +406,75 @@ void Player::RenderObjects(HDC hdc)
         int screenX, screenY;
         camera->WorldToScreen((int)obj.x, (int)obj.y, screenX, screenY);
 
+        const int half = PLAYER_SIZE / 2;
+        const int headTop  = screenY - half;  // top edge of sprite
+        const int footBot  = screenY + half;  // bottom edge of sprite
+
         if (obj.object_id >= NPC_ID_START) {
-            // Monster: use move animation while sliding, idle when stopped
+            // --- Monster ---
             int monFrame = (GetTickCount() / 150) % MON_IDLE_FRAMES;
             SpriteManager::DrawMonster(hdc, obj.visual_id, obj.isMoving, monFrame,
                 screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
+
+            // HP bar just above the sprite
+            DrawHpBar(hdc, screenX, headTop - 8, obj.hp, obj.max_hp);
+
+            // Monster name above the HP bar
+            SetTextColor(hdc, RGB(255, 200, 100));
+            const std::string& nm = obj.obj_name;
+            TextOutA(hdc, screenX - (int)(nm.size() * 4),
+                headTop - 20, nm.c_str(), (int)nm.size());
+
         } else {
-            // Player: draw their chosen character sprite
-            int objFrame = (GetTickCount() / 150) % SPRITE_IDLE_FRAMES;
-            SpriteManager::DrawSprite(hdc, obj.visual_id, false, objFrame,
+            // --- Other Player ---
+            int runFrames = obj.isMoving ? SPRITE_RUN_FRAMES : SPRITE_IDLE_FRAMES;
+            int objFrame  = (GetTickCount() / 150) % runFrames;
+            SpriteManager::DrawSprite(hdc, obj.visual_id, obj.isMoving, objFrame,
                 screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
+
+            // Name above head
+            SetTextColor(hdc, RGB(180, 220, 255));
+            const std::string& nm = obj.obj_name;
+            TextOutA(hdc, screenX - (int)(nm.size() * 4),
+                headTop - 15, nm.c_str(), (int)nm.size());
+
+            // Level text + HP bar below feet
+            SetTextColor(hdc, RGB(255, 255, 80));
+            char lvBuf[16];
+            sprintf_s(lvBuf, "Lv.%d", (int)obj.level);
+            TextOutA(hdc, screenX - (int)(strlen(lvBuf) * 4),
+                footBot + 2, lvBuf, (int)strlen(lvBuf));
+            DrawHpBar(hdc, screenX, footBot + 16, obj.hp, obj.max_hp > 0 ? obj.max_hp : 1);
         }
-
-        SetBkMode(hdc, TRANSPARENT);
-
-        // Level at top-left corner of object rect
-        SetTextColor(hdc, RGB(255, 255, 80));
-        char lvText[16];
-        sprintf_s(lvText, sizeof(lvText), "Lv.%d", (int)obj.level);
-        TextOutA(hdc, screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2,
-            lvText, static_cast<int>(strlen(lvText)));
-
-        // Name and HP above the object
-        SetTextColor(hdc, RGB(255, 255, 255));
-        char statusText[64];
-        sprintf_s(statusText, sizeof(statusText), "%s(HP:%d/%d)",
-            obj.obj_name.c_str(), obj.hp, obj.max_hp);
-        TextOutA(hdc, screenX - 20, screenY - 30, statusText, static_cast<int>(strlen(statusText)));
     }
+
+    // Floating damage numbers
+    for (const auto& dn : mDamageNumbers) {
+        auto it = mRenderList.find(dn.objectId);
+        if (it == mRenderList.end()) continue;
+        const RenderObject& obj = it->second;
+        int sx, sy;
+        camera->WorldToScreen((int)obj.x, (int)obj.y, sx, sy);
+
+        char numBuf[16];
+        sprintf_s(numBuf, "%d", dn.amount);
+        int tx = sx - (int)(strlen(numBuf) * 4);
+        int ty = sy - PLAYER_SIZE / 2 - 30 + (int)dn.offsetY;
+
+        SetTextColor(hdc, dn.isCrit ? RGB(255, 230, 0) : RGB(255, 255, 255));
+        TextOutA(hdc, tx, ty, numBuf, (int)strlen(numBuf));
+    }
+}
+
+void Player::AddDamageNumber(int objectId, int damage, bool isCrit)
+{
+    DamageNumber dn;
+    dn.objectId = objectId;
+    dn.amount   = damage;
+    dn.isCrit   = isCrit;
+    dn.timeLeft = 0.5f;
+    dn.offsetY  = 0.0f;
+    mDamageNumbers.push_back(dn);
 }
 
 std::string Player::GetObjectName(int objectId) const

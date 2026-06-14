@@ -4,6 +4,7 @@
 #include "Object.h"
 #include "protocol_2026.h"
 #include <string>
+#include <vector>
 
 class Player : public Object
 {
@@ -53,6 +54,19 @@ public:
 	// Visual / sprite
 	void SetMyVisualId(int id) { mVisualId = id; }
 
+	// In-game stat update (no position snap)
+	void UpdateAvatarStats(int hp, int maxHp, unsigned long long exp, unsigned char level)
+	{
+		SetHp(hp); mMaxHp = maxHp; mExp = exp; mLevel = level;
+	}
+
+	// First AVATAR_INFO sets position; subsequent ones only update stats
+	bool IsAvatarPositionSet() const { return mAvatarPositionSet; }
+	void MarkAvatarPositionSet()      { mAvatarPositionSet = true; }
+
+	// Floating damage numbers
+	void AddDamageNumber(int objectId, int damage, bool isCrit);
+
 	// Party
 	void SetMyUsername(const std::string& name) { mMyUsername = name; }
 	void OnPartyUpdate(int partyId, int memberCount, PartyMemberInfo* members);
@@ -65,6 +79,15 @@ public:
 	void SendPartyListReq();
 
 private:
+	struct DamageNumber
+	{
+		int   objectId;
+		int   amount;
+		bool  isCrit;
+		float timeLeft;  // seconds until disappear
+		float offsetY;   // pixel drift upward over time
+	};
+
 	struct RenderObject
 	{
 		int object_id;
@@ -110,6 +133,7 @@ private:
 	unsigned char mLuk;
 	unsigned char mStatPoints;
 	std::unordered_map<int, RenderObject> mRenderList;
+	std::vector<DamageNumber>             mDamageNumbers;
 
 	// Movement / position tracking
 	int mLastSentX;
@@ -123,6 +147,8 @@ private:
 	float mAnimTimer;
 	bool  mFacingLeft;
 	bool  mIsMoving;
+	float mMoveAccum;
+	bool  mAvatarPositionSet;
 
 	// Party state
 	int                      mPartyId;

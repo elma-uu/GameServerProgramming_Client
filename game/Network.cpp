@@ -103,13 +103,20 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_AVATAR_INFO:
 	{
 		S2C_AvatarInfo* packet = reinterpret_cast<S2C_AvatarInfo*>(recv_packet);
-		// �������� ���� Ÿ�� ��ǥ(x, y)�� �ȼ� ��ǥ�� ��ȯ (Ÿ�� ũ��: 50)
-		// Ÿ�� ����: Ÿ�� �߽� = Ÿ�Ϲ�ȣ * 50 + 25
 		int pixelX = packet->x * 50 + 25;
 		int pixelY = packet->y * 50 + 25;
-		GAME.GetAvatar()->SetPlayerInfo(packet->playerId, pixelX, pixelY,
-			packet->hp, packet->max_hp, packet->exp, packet->level);
-		GAME.GetAvatar()->SetMyVisualId(packet->visualId);
+		if (!GAME.GetAvatar()->IsAvatarPositionSet()) {
+			// First AVATAR_INFO: set spawn position, visual, and all stats
+			GAME.GetAvatar()->SetPlayerInfo(packet->playerId, pixelX, pixelY,
+				packet->hp, packet->max_hp, packet->exp, packet->level);
+			GAME.GetAvatar()->SetMyVisualId(packet->visualId);
+			GAME.GetAvatar()->MarkAvatarPositionSet();
+		} else {
+			// Subsequent (kill reward, level-up): update stats + visual, never snap position
+			GAME.GetAvatar()->SetMyVisualId(packet->visualId);
+			GAME.GetAvatar()->UpdateAvatarStats(packet->hp, packet->max_hp,
+				packet->exp, packet->level);
+		}
 		printf("Avatar info received - Tile: (%d, %d) -> Pixel: (%d, %d), visual=%d\n",
 			packet->x, packet->y, pixelX, pixelY, packet->visualId);
 	}
@@ -204,6 +211,12 @@ void Network::ProcessPacket(char* recv_packet)
 	{
 		S2C_PartyList* pkt = reinterpret_cast<S2C_PartyList*>(recv_packet);
 		GAME.GetAvatar()->OnPartyList((int)pkt->party_count, pkt->entries);
+	}
+	break;
+	case S2C_DAMAGE_NUMBER:
+	{
+		S2C_DamageNumber* pkt = reinterpret_cast<S2C_DamageNumber*>(recv_packet);
+		GAME.GetAvatar()->AddDamageNumber(pkt->object_id, pkt->damage, pkt->is_crit != 0);
 	}
 	break;
 	default:
