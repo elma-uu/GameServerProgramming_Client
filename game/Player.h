@@ -39,7 +39,7 @@ public:
     void RenderObjects(HDC hdc);
 
     // Network sends
-    void SendMoveToServer(int pixelX, int pixelY);
+    void SendMoveToServer(int tileX, int tileY);
     void SendAttackPacket(DIRECTION dir);
     void SendAoeAttackPacket(DIRECTION dir);
     void SendStatInvestPacket(STAT_TYPE statType);

@@ -144,9 +144,9 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_MOVE_OBJECT:
 	{
 		S2C_MoveObject* packet = reinterpret_cast<S2C_MoveObject*>(recv_packet);
-		// coords are now pixel coordinates (players) or tile*50+25 (NPCs)
-		int pixelX = packet->x;
-		int pixelY = packet->y;
+		// coords are tile coordinates; convert to pixel center for rendering
+		int pixelX = packet->x * 50 + 25;
+		int pixelY = packet->y * 50 + 25;
 
 		if (packet->object_id != GAME.GetAvatar()->GetPlayerID())
 		{

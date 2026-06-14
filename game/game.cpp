@@ -429,7 +429,7 @@ void SendAoeAttackToServer(DIRECTION dir)
 	network->Send(&packet);
 }
 
-void SendPlayerMovePacket(int pixelX, int pixelY)
+void SendPlayerMovePacket(int tileX, int tileY)
 {
 	Network* network = GAME.GetNetwork();
 	if (network != nullptr)
@@ -437,8 +437,8 @@ void SendPlayerMovePacket(int pixelX, int pixelY)
 		C2S_Move movePacket;
 		movePacket.size = sizeof(C2S_Move);
 		movePacket.type = C2S_MOVE;
-		movePacket.x = pixelX;
-		movePacket.y = pixelY;
+		movePacket.x = static_cast<short>(tileX);
+		movePacket.y = static_cast<short>(tileY);
 		movePacket.dir = GAME.GetAvatar()->GetLastDirection();
 		movePacket.move_time = 0;
 		network->Send(&movePacket);

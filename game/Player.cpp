@@ -220,11 +220,11 @@ void Player::LateUpdate()
     int currentTileY = GetY() / TILE_SIZE;
     bool tileChanged = (currentTileX != mLastSentX || currentTileY != mLastSentY);
 
-    // Send pixel position on tile change OR every 50 ms while moving
+    // Sync tile position 10 times/s: on tile change or every 100 ms while moving
     mSendTimer += dt;
-    if (tileChanged || (mIsMoving && mSendTimer >= 0.05f))
+    if (tileChanged || (mIsMoving && mSendTimer >= 0.1f))
     {
-        SendMoveToServer(GetX(), GetY());
+        SendMoveToServer(currentTileX, currentTileY);
         mLastSentX = currentTileX;
         mLastSentY = currentTileY;
         mSendTimer = 0.0f;
@@ -599,10 +599,10 @@ void Player::SendStatInvestPacket(STAT_TYPE statType)
     SendStatInvest(statType);
 }
 
-void Player::SendMoveToServer(int pixelX, int pixelY)
+void Player::SendMoveToServer(int tileX, int tileY)
 {
     extern void SendPlayerMovePacket(int x, int y);
-    SendPlayerMovePacket(pixelX, pixelY);
+    SendPlayerMovePacket(tileX, tileY);
 }
 
 void Player::SendAoeAttackPacket(DIRECTION dir)
