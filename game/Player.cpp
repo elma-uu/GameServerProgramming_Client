@@ -428,6 +428,18 @@ void Player::RenderObjects(HDC hdc)
         const int footBot  = screenY + half;  // bottom edge of sprite
 
         if (obj.object_id >= NPC_ID_START) {
+            if (obj.visual_id >= NPC_ABILITY) {
+                // --- Town NPC (Ability / Restaurant / Shop) ---
+                int npcFrame = (GetTickCount() / 200) % 6; // max frames among all types
+                SpriteManager::DrawTownNpc(hdc, obj.visual_id, npcFrame,
+                    screenX, screenY, PLAYER_SIZE, PLAYER_SIZE);
+
+                // Name above sprite in white
+                SetTextColor(hdc, RGB(255, 255, 255));
+                const std::string& nm = obj.obj_name;
+                TextOutA(hdc, screenX - (int)(nm.size() * 4),
+                    screenY - PLAYER_SIZE / 2 - 18, nm.c_str(), (int)nm.size());
+            } else {
             // --- Monster ---
             // Big_Normal renders 2 tiles tall; sprite top is TILE_SIZE above the
             // normal head, bottom aligns with the actual position tile's bottom edge.
@@ -456,6 +468,7 @@ void Player::RenderObjects(HDC hdc)
             const std::string& nm = obj.obj_name;
             TextOutA(hdc, screenX - (int)(nm.size() * 4),
                 spriteTop - 20, nm.c_str(), (int)nm.size());
+            }
 
         } else {
             // --- Other Player ---

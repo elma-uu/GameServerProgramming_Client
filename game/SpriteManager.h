@@ -12,6 +12,13 @@ constexpr int SPRITE_RUN_FRAMES  = 8;
 // 0=Dog  1=Small  2=Big_Normal  3=Magician_Ice
 enum { MON_DOG=0, MON_SMALL=1, MON_BIG_NORMAL=2, MON_MAGICIAN=3, MON_COUNT=4 };
 
+// Town NPC visual IDs (4=Ability 5=Restaurant 6=Shop)
+enum { NPC_ABILITY=4, NPC_RESTAURANT=5, NPC_SHOP=6, NPC_TOWN_COUNT=3 };
+// Frame counts for each town NPC sprite sheet
+constexpr int NPC_ABILITY_FRAMES    = 6;
+constexpr int NPC_RESTAURANT_FRAMES = 6;
+constexpr int NPC_SHOP_FRAMES       = 4;
+
 // Per-monster frame counts (measured from actual sprite sheet dimensions)
 // Dog         idle=100/20=5   move=140/20=7
 // Small       idle=14/14=1    move=84/14=6
@@ -45,6 +52,10 @@ public:
     static void DrawMonster(HDC hdc, int monType, bool isMoving, int frame,
                             int screenX, int screenY, int drawW, int drawH, bool flipH = false);
 
+    // Draw a town NPC sprite (Ability/Restaurant/Shop) centered at (screenX, screenY).
+    static void DrawTownNpc(HDC hdc, int visualId, int frame,
+                            int screenX, int screenY, int drawW, int drawH);
+
     static bool IsLoaded() { return sLoaded; }
 
 private:
@@ -61,6 +72,12 @@ private:
         Gdiplus::Bitmap* move = nullptr;  // nullptr for types that have no move sheet
     };
     static MonSprites   sMonsters[MON_COUNT];
+
+    // ---- town NPC sprites (single sheet, no move animation) ----
+    static Gdiplus::Bitmap* sNpcSheets[NPC_TOWN_COUNT]; // [0]=Ability [1]=Restaurant [2]=Shop
+
+    static std::wstring FindNpcDir();
+    static Gdiplus::Bitmap* LoadNpcBmp(const std::wstring& dir, const wchar_t* fileName);
 
     static bool         sLoaded;
     static ULONG_PTR    sGdiplusToken;

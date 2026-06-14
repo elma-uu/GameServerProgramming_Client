@@ -3,6 +3,7 @@
 
 SpriteManager::CharSprites SpriteManager::sSprites[CHAR_COUNT]   = {};
 SpriteManager::MonSprites  SpriteManager::sMonsters[MON_COUNT]   = {};
+Gdiplus::Bitmap*           SpriteManager::sNpcSheets[NPC_TOWN_COUNT] = {};
 bool         SpriteManager::sLoaded       = false;
 ULONG_PTR    SpriteManager::sGdiplusToken = 0;
 
@@ -60,6 +61,14 @@ void SpriteManager::Init()
         }
     }
 
+    // --- town NPC sprites ---
+    std::wstring npcDir = FindNpcDir();
+    if (!npcDir.empty()) {
+        sNpcSheets[0] = LoadNpcBmp(npcDir, L"Ability");
+        sNpcSheets[1] = LoadNpcBmp(npcDir, L"restaurant");
+        sNpcSheets[2] = LoadNpcBmp(npcDir, L"shop");
+    }
+
     sLoaded = true;
 }
 
@@ -72,6 +81,9 @@ void SpriteManager::Shutdown()
     for (int i = 0; i < MON_COUNT; ++i) {
         delete sMonsters[i].idle; sMonsters[i].idle = nullptr;
         delete sMonsters[i].move; sMonsters[i].move = nullptr;
+    }
+    for (int i = 0; i < NPC_TOWN_COUNT; ++i) {
+        delete sNpcSheets[i]; sNpcSheets[i] = nullptr;
     }
     if (sGdiplusToken) {
         Gdiplus::GdiplusShutdown(sGdiplusToken);
@@ -252,6 +264,88 @@ Gdiplus::Bitmap* SpriteManager::LoadMonBmp(const std::wstring& monDir,
 // ---------------------------------------------------------------------------
 // Monster drawing
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Town NPC path discovery and loading
+// ---------------------------------------------------------------------------
+
+std::wstring SpriteManager::FindNpcDir()
+{
+    WCHAR exeDir[MAX_PATH];
+    GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
+    WCHAR* last = wcsrchr(exeDir, L'\\');
+    if (last) *(last + 1) = L'\0';
+
+    const wchar_t* candidates[] = {
+        L"..\\..\\game\\Resource\\NPC\\",
+        L"..\\..\\..\\game\\Resource\\NPC\\",
+        L"game\\Resource\\NPC\\",
+        L"Resource\\NPC\\",
+        L"..\\Resource\\NPC\\",
+    };
+
+    for (const wchar_t* rel : candidates) {
+        WCHAR full[MAX_PATH];
+        swprintf_s(full, MAX_PATH, L"%s%s", exeDir, rel);
+        WCHAR probe[MAX_PATH];
+        swprintf_s(probe, MAX_PATH, L"%sAbility.png", full);
+        if (GetFileAttributesW(probe) != INVALID_FILE_ATTRIBUTES)
+            return std::wstring(full);
+    }
+    return L"";
+}
+
+Gdiplus::Bitmap* SpriteManager::LoadNpcBmp(const std::wstring& dir, const wchar_t* fileName)
+{
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, MAX_PATH, L"%s%s.png", dir.c_str(), fileName);
+    Gdiplus::Bitmap* bmp = Gdiplus::Bitmap::FromFile(path);
+    if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+        delete bmp;
+        return nullptr;
+    }
+    return bmp;
+}
+
+// ---------------------------------------------------------------------------
+// Town NPC drawing
+// ---------------------------------------------------------------------------
+
+void SpriteManager::DrawTownNpc(HDC hdc, int visualId, int frame,
+                                 int screenX, int screenY, int drawW, int drawH)
+{
+    int idx = visualId - NPC_ABILITY; // 4->0, 5->1, 6->2
+    if (idx < 0 || idx >= NPC_TOWN_COUNT) return;
+
+    const int frameCounts[NPC_TOWN_COUNT] = {
+        NPC_ABILITY_FRAMES, NPC_RESTAURANT_FRAMES, NPC_SHOP_FRAMES
+    };
+
+    int destX = screenX - drawW / 2;
+    int destY = screenY - drawH / 2;
+
+    Gdiplus::Bitmap* sheet = sNpcSheets[idx];
+    if (!sheet) {
+        // Fallback: colored rectangle
+        static const COLORREF kNpcColors[NPC_TOWN_COUNT] = {
+            RGB(100, 200, 255), // Ability - light blue
+            RGB(255, 180, 80),  // Restaurant - orange
+            RGB(120, 220, 120), // Shop - green
+        };
+        HBRUSH br  = CreateSolidBrush(kNpcColors[idx]);
+        HBRUSH old = (HBRUSH)SelectObject(hdc, br);
+        Rectangle(hdc, destX, destY, destX + drawW, destY + drawH);
+        SelectObject(hdc, old);
+        DeleteObject(br);
+        return;
+    }
+
+    Gdiplus::Graphics g(hdc);
+    g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+    g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+    DrawFrame(g, sheet, frame % frameCounts[idx], frameCounts[idx],
+              destX, destY, drawW, drawH, false);
+}
 
 void SpriteManager::DrawMonster(HDC hdc, int monType, bool isMoving, int frame,
                                  int screenX, int screenY, int drawW, int drawH, bool flipH)
