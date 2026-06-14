@@ -70,8 +70,10 @@ private:
 		int object_id;
 		std::string obj_name;
 		int visual_id;
-		int x;
-		int y;
+		float x, y;           // current interpolated screen-pixel position
+		float targetX, targetY; // server-provided destination
+		bool  isMoving;       // true while sliding toward target
+		bool  facingLeft;     // true when last horizontal movement was leftward
 		int hp;
 		int max_hp;
 		unsigned long long exp;

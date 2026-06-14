@@ -1,9 +1,22 @@
 #include "SpriteManager.h"
 #pragma comment(lib, "gdiplus.lib")
 
-SpriteManager::CharSprites SpriteManager::sSprites[CHAR_COUNT] = {};
+SpriteManager::CharSprites SpriteManager::sSprites[CHAR_COUNT]   = {};
+SpriteManager::MonSprites  SpriteManager::sMonsters[MON_COUNT]   = {};
 bool         SpriteManager::sLoaded       = false;
 ULONG_PTR    SpriteManager::sGdiplusToken = 0;
+
+// monster subfolder names (Resource/monster/Skeleton/<name>/)
+static const wchar_t* kMonFolders[MON_COUNT] = {
+    L"Dog", L"Small", L"Big_Normal", L"Magician_Ice"
+};
+// fallback colours when sprite not loaded
+static const COLORREF kMonColors[MON_COUNT] = {
+    RGB(180, 130,  80),   // Dog         – sandy brown
+    RGB(100, 180,  80),   // Small       – lime green
+    RGB( 80, 100, 180),   // Big_Normal  – steel blue
+    RGB(160,  80, 200),   // Magician    – purple
+};
 
 static const char* kCharFolders[CHAR_COUNT] = {
     "base", "alice", "metalPlate", "pickax", "redLotus"
@@ -29,11 +42,21 @@ void SpriteManager::Init()
     Gdiplus::GdiplusStartupInput si;
     Gdiplus::GdiplusStartup(&sGdiplusToken, &si, nullptr);
 
+    // --- character sprites ---
     std::wstring dir = FindCharacterDir();
     if (!dir.empty()) {
         for (int i = 0; i < CHAR_COUNT; ++i) {
             sSprites[i].idle = LoadBmp(dir, kCharFolders[i], "idle");
             sSprites[i].run  = LoadBmp(dir, kCharFolders[i], "run");
+        }
+    }
+
+    // --- monster sprites ---
+    std::wstring monDir = FindMonsterDir();
+    if (!monDir.empty()) {
+        for (int i = 0; i < MON_COUNT; ++i) {
+            sMonsters[i].idle = LoadMonBmp(monDir, kMonFolders[i], L"idle");
+            sMonsters[i].move = LoadMonBmp(monDir, kMonFolders[i], L"move");
         }
     }
 
@@ -45,6 +68,10 @@ void SpriteManager::Shutdown()
     for (int i = 0; i < CHAR_COUNT; ++i) {
         delete sSprites[i].idle; sSprites[i].idle = nullptr;
         delete sSprites[i].run;  sSprites[i].run  = nullptr;
+    }
+    for (int i = 0; i < MON_COUNT; ++i) {
+        delete sMonsters[i].idle; sMonsters[i].idle = nullptr;
+        delete sMonsters[i].move; sMonsters[i].move = nullptr;
     }
     if (sGdiplusToken) {
         Gdiplus::GdiplusShutdown(sGdiplusToken);
@@ -175,4 +202,90 @@ void SpriteManager::DrawSprite(HDC hdc, int charId, bool isRunning, int frame,
 void SpriteManager::DrawPreview(HDC hdc, int charId, int cx, int cy, int size)
 {
     DrawSprite(hdc, charId, false, 0, cx, cy, size, size, false);
+}
+
+// ---------------------------------------------------------------------------
+// Monster path discovery
+// ---------------------------------------------------------------------------
+
+std::wstring SpriteManager::FindMonsterDir()
+{
+    WCHAR exeDir[MAX_PATH];
+    GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
+    WCHAR* last = wcsrchr(exeDir, L'\\');
+    if (last) *(last + 1) = L'\0';
+
+    const wchar_t* candidates[] = {
+        L"..\\..\\game\\Resource\\monster\\Skeleton\\",
+        L"..\\..\\..\\game\\Resource\\monster\\Skeleton\\",
+        L"game\\Resource\\monster\\Skeleton\\",
+        L"Resource\\monster\\Skeleton\\",
+        L"..\\Resource\\monster\\Skeleton\\",
+    };
+
+    for (const wchar_t* rel : candidates) {
+        WCHAR full[MAX_PATH];
+        swprintf_s(full, MAX_PATH, L"%s%s", exeDir, rel);
+        WCHAR probe[MAX_PATH];
+        swprintf_s(probe, MAX_PATH, L"%sDog\\idle.png", full);
+        if (GetFileAttributesW(probe) != INVALID_FILE_ATTRIBUTES)
+            return std::wstring(full);
+    }
+    return L"";
+}
+
+Gdiplus::Bitmap* SpriteManager::LoadMonBmp(const std::wstring& monDir,
+                                             const wchar_t* subFolder,
+                                             const wchar_t* fileName)
+{
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, MAX_PATH, L"%s%s\\%s.png", monDir.c_str(), subFolder, fileName);
+
+    Gdiplus::Bitmap* bmp = Gdiplus::Bitmap::FromFile(path);
+    if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+        delete bmp;
+        return nullptr;
+    }
+    return bmp;
+}
+
+// ---------------------------------------------------------------------------
+// Monster drawing
+// ---------------------------------------------------------------------------
+
+void SpriteManager::DrawMonster(HDC hdc, int monType, bool isMoving, int frame,
+                                 int screenX, int screenY, int drawW, int drawH, bool flipH)
+{
+    if (monType < 0 || monType >= MON_COUNT) monType = MON_DOG;
+
+    const MonFrameInfo& fi = MON_FRAMES[monType];
+
+    // Use move sheet if moving and it exists; fall back to idle
+    Gdiplus::Bitmap* sheet = nullptr;
+    int totalFrames = fi.idleFrames;
+    if (isMoving && sMonsters[monType].move && fi.moveFrames > 0) {
+        sheet       = sMonsters[monType].move;
+        totalFrames = fi.moveFrames;
+    } else {
+        sheet       = sMonsters[monType].idle;
+        totalFrames = fi.idleFrames;
+    }
+    if (totalFrames <= 0) totalFrames = 1;
+
+    int destX = screenX - drawW / 2;
+    int destY = screenY - drawH / 2;
+
+    if (!sheet) {
+        HBRUSH br  = CreateSolidBrush(kMonColors[monType]);
+        HBRUSH old = (HBRUSH)SelectObject(hdc, br);
+        Rectangle(hdc, destX, destY, destX + drawW, destY + drawH);
+        SelectObject(hdc, old);
+        DeleteObject(br);
+        return;
+    }
+
+    Gdiplus::Graphics g(hdc);
+    g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+    g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+    DrawFrame(g, sheet, frame, totalFrames, destX, destY, drawW, drawH, flipH);
 }

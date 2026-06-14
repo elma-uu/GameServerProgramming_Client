@@ -5,6 +5,7 @@
 #include "Camera.h"
 #include "Time.h"
 #include "SpriteManager.h"
+#include <cmath>
 
 // �� �����Ӵ� �̵� �Ÿ� (�׽�Ʈ��)
 // 60FPS ����: 200�ȼ�/�� �� 60fps = �� 3.33�ȼ�/������
@@ -156,6 +157,26 @@ void Player::Update()
         mAnimTimer = 0.0f;
         mAnimFrame = (mAnimFrame + 1) % numFrames;
     }
+
+    // Smooth interpolation for render objects (monsters & other players)
+    const float MOVE_SPEED = 100.0f; // pixels per second (one tile = 50px, arrives in 0.5s)
+    float dt = Time::DeltaTime();
+    for (auto& [id, obj] : mRenderList) {
+        if (!obj.isMoving) continue;
+        float dx   = obj.targetX - obj.x;
+        float dy   = obj.targetY - obj.y;
+        float dist = sqrtf(dx * dx + dy * dy);
+        if (dist < 1.0f) {
+            obj.x = obj.targetX;
+            obj.y = obj.targetY;
+            obj.isMoving = false;
+        } else {
+            float step = MOVE_SPEED * dt;
+            if (step > dist) step = dist;
+            obj.x += dx / dist * step;
+            obj.y += dy / dist * step;
+        }
+    }
 }
 
 void Player::LateUpdate()
@@ -219,15 +240,14 @@ void Player::AddObject(int objectId, const std::string& objName, int visualId,
 {
     RenderObject obj;
     obj.object_id = objectId;
-    obj.obj_name = objName;
+    obj.obj_name  = objName;
     obj.visual_id = visualId;
-    // Network.cpp���� �̹� �ȼ� ��ǥ�� ��ȯ�Ǿ� ���޵�
-    obj.x = x;
-    obj.y = y;
-    obj.hp = hp;
-    obj.max_hp = max_hp;
-    obj.exp = exp;
-    obj.level = level;
+    obj.x = obj.targetX = (float)x;
+    obj.y = obj.targetY = (float)y;
+    obj.isMoving  = false;
+    obj.facingLeft = false;
+    obj.hp = hp;  obj.max_hp = max_hp;
+    obj.exp = exp; obj.level = level;
 
     mRenderList[objectId] = obj;
 }
@@ -246,9 +266,12 @@ void Player::UpdateObjectPosition(int objectId, int x, int y)
     auto it = mRenderList.find(objectId);
     if (it != mRenderList.end())
     {
-        // Network.cpp���� �̹� �ȼ� ��ǥ�� ��ȯ�Ǿ� ���޵�
-        it->second.x = x;
-        it->second.y = y;
+        RenderObject& obj = it->second;
+        if (x != (int)obj.targetX)
+            obj.facingLeft = (x < obj.x);
+        obj.targetX  = (float)x;
+        obj.targetY  = (float)y;
+        obj.isMoving = true;
     }
 }
 
@@ -281,22 +304,18 @@ void Player::RenderObjects(HDC hdc)
     {
         const RenderObject& obj = pair.second;
         int screenX, screenY;
-        camera->WorldToScreen(obj.x, obj.y, screenX, screenY);
+        camera->WorldToScreen((int)obj.x, (int)obj.y, screenX, screenY);
 
         if (obj.object_id >= NPC_ID_START) {
-            // Monster: keep as colored rectangle (no sprite yet)
-            HBRUSH br = CreateSolidBrush(RGB(220, 100, 50));
-            HBRUSH ob = (HBRUSH)SelectObject(hdc, br);
-            Rectangle(hdc,
-                screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2,
-                screenX + PLAYER_SIZE / 2, screenY + PLAYER_SIZE / 2);
-            SelectObject(hdc, ob);
-            DeleteObject(br);
+            // Monster: use move animation while sliding, idle when stopped
+            int monFrame = (GetTickCount() / 150) % MON_IDLE_FRAMES;
+            SpriteManager::DrawMonster(hdc, obj.visual_id, obj.isMoving, monFrame,
+                screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
         } else {
             // Player: draw their chosen character sprite
             int objFrame = (GetTickCount() / 150) % SPRITE_IDLE_FRAMES;
             SpriteManager::DrawSprite(hdc, obj.visual_id, false, objFrame,
-                screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, false);
+                screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
         }
 
         SetBkMode(hdc, TRANSPARENT);
