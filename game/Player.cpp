@@ -106,7 +106,7 @@ void Player::Update()
             mShowAbilityUI = false;
             return;
         }
-        if (Input::GetKeyDown(eKeyCode::LButton) && mStatPoints > 0) {
+        if (Input::GetKeyDown(eKeyCode::LButton) && mStatPoints > 0 && IsInSafeZone()) {
             // Plus button rects (x, y, w, h) — must match RenderAbilityUI layout
             // Panel: x=100, y=90, w=600, h=400
             // 4 columns centered at x = 175, 325, 475, 625
@@ -183,8 +183,8 @@ void Player::Update()
         mAoeCooldown = 3.0f;
     }
 
-    // stat investment: press 1-4 when stat points are available
-    if (mStatPoints > 0)
+    // stat investment: press 1-4 only while inside the town safe zone
+    if (mStatPoints > 0 && IsInSafeZone())
     {
         if (Input::GetKeyDown(eKeyCode::Key1)) SendStatInvestPacket(STAT_STR);
         if (Input::GetKeyDown(eKeyCode::Key2)) SendStatInvestPacket(STAT_INT);
@@ -1046,6 +1046,20 @@ bool Player::IsNearShopNpc() const
             return true;
     }
     return false;
+}
+
+// ---------------------------------------------------------------------------
+// Safe zone check — matches server TOWN_SAFE_R = 30 tiles around (1000,1000)
+// ---------------------------------------------------------------------------
+
+bool Player::IsInSafeZone() const
+{
+    const int myTileX = GetX() / TILE_SIZE;
+    const int myTileY = GetY() / TILE_SIZE;
+    const int SAFE_R = 30;
+    int dx = myTileX - 1000;
+    int dy = myTileY - 1000;
+    return dx * dx + dy * dy <= SAFE_R * SAFE_R;
 }
 
 // ---------------------------------------------------------------------------

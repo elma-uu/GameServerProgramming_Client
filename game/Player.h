@@ -150,6 +150,7 @@ private:
     bool      IsNearAbilityNpc() const;
     void      RenderShopUI(HDC hdc);
     bool      IsNearShopNpc() const;
+    bool      IsInSafeZone() const;
 
     // --- data members ---
     int                playerID  = -1;
