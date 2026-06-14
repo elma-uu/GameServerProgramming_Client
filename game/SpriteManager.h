@@ -56,6 +56,14 @@ public:
     static void DrawTownNpc(HDC hdc, int visualId, int frame,
                             int screenX, int screenY, int drawW, int drawH);
 
+    // Draw a UI image (stat icon or button) at (x, y) with given size.
+    static void DrawUiImage(HDC hdc, int uiIdx, int x, int y, int w, int h);
+    // uiIdx: 0=STR 1=INT 2=DEX 3=LUK 4=plus_button
+
+    // Draw a shop item icon at (x, y) with given size.
+    static void DrawItemImage(HDC hdc, int itemIdx, int x, int y, int w, int h);
+    // itemIdx: 0=HP Potion  1=Teleport Scroll
+
     static bool IsLoaded() { return sLoaded; }
 
 private:
@@ -76,8 +84,18 @@ private:
     // ---- town NPC sprites (single sheet, no move animation) ----
     static Gdiplus::Bitmap* sNpcSheets[NPC_TOWN_COUNT]; // [0]=Ability [1]=Restaurant [2]=Shop
 
+    // ---- UI images: [0]=STR [1]=INT [2]=DEX [3]=LUK [4]=plus_button ----
+    static Gdiplus::Bitmap* sUiImages[5];
+
     static std::wstring FindNpcDir();
     static Gdiplus::Bitmap* LoadNpcBmp(const std::wstring& dir, const wchar_t* fileName);
+    static std::wstring FindUiDir();
+    static Gdiplus::Bitmap* LoadUiBmp(const std::wstring& dir, const wchar_t* fileName);
+    static std::wstring FindItemDir();
+    static Gdiplus::Bitmap* LoadItemBmp(const std::wstring& dir, const wchar_t* fileName);
+
+    // ---- shop item images: [0]=potion  [1]=teleport ----
+    static Gdiplus::Bitmap* sItemImages[2];
 
     static bool         sLoaded;
     static ULONG_PTR    sGdiplusToken;

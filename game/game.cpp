@@ -69,8 +69,9 @@ void Game::Update()
 			std::wstring pw = Input::GetLoginPw();
 			if (!id.empty() && !pw.empty())
 			{
-				std::string idStr(id.begin(), id.end());
-				std::string pwStr(pw.begin(), pw.end());
+				std::string idStr, pwStr;
+				for (wchar_t c : id) idStr += static_cast<char>(c);
+				for (wchar_t c : pw) pwStr += static_cast<char>(c);
 				SendLoginPacket(idStr, pwStr);
 				mLoginMessage = "Connecting...";
 			}
@@ -170,7 +171,7 @@ void Game::adjustWindowRect(HWND hwnd, UINT width, UINT height)
 	mHwnd = hwnd;
 	mHdc = GetDC(hwnd);
 
-	RECT rect = { 0, 0, width, height };
+	RECT rect = { 0, 0, (LONG)width, (LONG)height };
 	AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, false);
 
 	mWidth = rect.right - rect.left;

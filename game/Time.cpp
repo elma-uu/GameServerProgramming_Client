@@ -8,10 +8,10 @@ float Time::DeltaTimeValue = 0.0f;
 bool Time::TimeStop;
 void Time::Initialize()
 {
-    // Cpu °íÀ¯ Áøµ¿¼ö
+    // Cpu ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     QueryPerformanceFrequency(&CpuFrequency);
 
-    // ÇÁ·Î±×·¥ÀÌ ½ÃÀÛ ÇßÀ» ¶§ ÇöÀç Áøµ¿¼ö
+    // ï¿½ï¿½ï¿½Î±×·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     QueryPerformanceCounter(&PrevFrequency);
 }
 
@@ -37,14 +37,14 @@ void Time::Render(HDC hdc)
     wchar_t str[50] = L"";
     swprintf_s(str, 50, L"FPS : %d", (int)fps);
     SetTextColor(hdc, RGB(255, 255, 255));
-    SetBkMode(hdc, TRANSPARENT); // ¹è°æÀ» Åõ¸íÇÏ°Ô ¼³Á¤
+    SetBkMode(hdc, TRANSPARENT); // ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï°ï¿½ ï¿½ï¿½ï¿½ï¿½
     HFONT hFont = CreateFont(20, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
         OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
         DEFAULT_PITCH | FF_DONTCARE, L"EXO 2");
 
     HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
 
-    TextOut(hdc, 1280 / 2, 0, str, wcslen(str));
+    TextOut(hdc, 1280 / 2, 0, str, (int)wcslen(str));
 
 
     SelectObject(hdc, hOldFont);

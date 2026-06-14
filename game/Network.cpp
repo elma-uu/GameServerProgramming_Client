@@ -1,6 +1,7 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include "Network.h"
 #include "Game.h"
+#include "protocol_2026.h"
 #include <string>
 
 Network::Network()
@@ -212,10 +213,32 @@ void Network::ProcessPacket(char* recv_packet)
 		GAME.GetAvatar()->AddDamageNumber(pkt->attacker_id, pkt->object_id, pkt->damage, pkt->is_crit != 0);
 	}
 	break;
+	case S2C_GOLD_UPDATE:
+	{
+		S2C_GoldUpdate* pkt = reinterpret_cast<S2C_GoldUpdate*>(recv_packet);
+		GAME.GetAvatar()->SetGold(pkt->gold);
+	}
+	break;
+	case S2C_BUY_RESULT:
+	{
+		S2C_BuyResult* pkt = reinterpret_cast<S2C_BuyResult*>(recv_packet);
+		GAME.GetAvatar()->OnBuyResult(pkt->success, pkt->item_type, pkt->gold,
+			pkt->new_hp, pkt->new_x, pkt->new_y);
+	}
+	break;
 	default:
 		// Unknown Packet Type
 		break;
 	}
+}
+
+void SendBuyItemToServer(ITEM_TYPE t)
+{
+	C2S_BuyItem pkt;
+	pkt.size      = sizeof(C2S_BuyItem);
+	pkt.type      = C2S_BUY_ITEM;
+	pkt.item_type = t;
+	GAME.GetNetwork()->Send(reinterpret_cast<void*>(&pkt));
 }
 
 void Network::ReceiveAndProcessPackets()

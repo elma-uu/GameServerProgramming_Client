@@ -43,6 +43,7 @@ public:
     void SendAttackPacket(DIRECTION dir);
     void SendAoeAttackPacket(DIRECTION dir);
     void SendStatInvestPacket(STAT_TYPE statType);
+    void SendBuyItemPacket(ITEM_TYPE itemType);
 
     // Getters
     int       GetPlayerID()       const { return playerID; }
@@ -79,6 +80,10 @@ public:
     void OnPartyList(int count, PartyListEntry* entries);
     void RenderPartyPanel(HDC hdc);
     void RenderPartyUI(HDC hdc);
+
+    // Shop
+    void SetGold(int g) { mGold = g; }
+    void OnBuyResult(unsigned char success, ITEM_TYPE item, int gold, int newHp, short newX, short newY);
     void SendPartyCreate();
     void SendPartyJoin(int partyId);
     void SendPartyLeave();
@@ -141,6 +146,10 @@ private:
     // --- private helpers ---
     DIRECTION GetMouseDirection()      const;
     void      RenderAttackEffects(HDC hdc) const;
+    void      RenderAbilityUI(HDC hdc);
+    bool      IsNearAbilityNpc() const;
+    void      RenderShopUI(HDC hdc);
+    bool      IsNearShopNpc() const;
 
     // --- data members ---
     int                playerID  = -1;
@@ -178,6 +187,12 @@ private:
 
     // State flags
     bool mAvatarPositionSet = false;
+    bool mShowAbilityUI     = false;
+    bool mShowShopUI        = false;
+
+    // Economy
+    int   mGold              = 0;
+    float mPotionCooldown    = 0.0f;
 
     // Party state
     int                       mPartyId          = -1;

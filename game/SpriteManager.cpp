@@ -4,6 +4,8 @@
 SpriteManager::CharSprites SpriteManager::sSprites[CHAR_COUNT]   = {};
 SpriteManager::MonSprites  SpriteManager::sMonsters[MON_COUNT]   = {};
 Gdiplus::Bitmap*           SpriteManager::sNpcSheets[NPC_TOWN_COUNT] = {};
+Gdiplus::Bitmap*           SpriteManager::sUiImages[5]               = {};
+Gdiplus::Bitmap*           SpriteManager::sItemImages[2]             = {};
 bool         SpriteManager::sLoaded       = false;
 ULONG_PTR    SpriteManager::sGdiplusToken = 0;
 
@@ -69,6 +71,23 @@ void SpriteManager::Init()
         sNpcSheets[2] = LoadNpcBmp(npcDir, L"shop");
     }
 
+    // --- UI images ---
+    std::wstring uiDir = FindUiDir();
+    if (!uiDir.empty()) {
+        sUiImages[0] = LoadUiBmp(uiDir, L"STR");
+        sUiImages[1] = LoadUiBmp(uiDir, L"INT");
+        sUiImages[2] = LoadUiBmp(uiDir, L"DEX");
+        sUiImages[3] = LoadUiBmp(uiDir, L"LUK");
+        sUiImages[4] = LoadUiBmp(uiDir, L"plus_button");
+    }
+
+    // --- item images ---
+    std::wstring itemDir = FindItemDir();
+    if (!itemDir.empty()) {
+        sItemImages[0] = LoadItemBmp(itemDir, L"potion");
+        sItemImages[1] = LoadItemBmp(itemDir, L"teleport");
+    }
+
     sLoaded = true;
 }
 
@@ -84,6 +103,12 @@ void SpriteManager::Shutdown()
     }
     for (int i = 0; i < NPC_TOWN_COUNT; ++i) {
         delete sNpcSheets[i]; sNpcSheets[i] = nullptr;
+    }
+    for (int i = 0; i < 5; ++i) {
+        delete sUiImages[i]; sUiImages[i] = nullptr;
+    }
+    for (int i = 0; i < 2; ++i) {
+        delete sItemImages[i]; sItemImages[i] = nullptr;
     }
     if (sGdiplusToken) {
         Gdiplus::GdiplusShutdown(sGdiplusToken);
@@ -308,6 +333,59 @@ Gdiplus::Bitmap* SpriteManager::LoadNpcBmp(const std::wstring& dir, const wchar_
 }
 
 // ---------------------------------------------------------------------------
+// UI image path discovery, loading, drawing
+// ---------------------------------------------------------------------------
+
+std::wstring SpriteManager::FindUiDir()
+{
+    WCHAR exeDir[MAX_PATH];
+    GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
+    WCHAR* last = wcsrchr(exeDir, L'\\');
+    if (last) *(last + 1) = L'\0';
+
+    const wchar_t* candidates[] = {
+        L"..\\..\\game\\Resource\\Ui\\",
+        L"..\\..\\..\\game\\Resource\\Ui\\",
+        L"game\\Resource\\Ui\\",
+        L"Resource\\Ui\\",
+        L"..\\Resource\\Ui\\",
+    };
+
+    for (const wchar_t* rel : candidates) {
+        WCHAR full[MAX_PATH];
+        swprintf_s(full, MAX_PATH, L"%s%s", exeDir, rel);
+        WCHAR probe[MAX_PATH];
+        swprintf_s(probe, MAX_PATH, L"%sSTR.png", full);
+        if (GetFileAttributesW(probe) != INVALID_FILE_ATTRIBUTES)
+            return std::wstring(full);
+    }
+    return L"";
+}
+
+Gdiplus::Bitmap* SpriteManager::LoadUiBmp(const std::wstring& dir, const wchar_t* fileName)
+{
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, MAX_PATH, L"%s%s.png", dir.c_str(), fileName);
+    Gdiplus::Bitmap* bmp = Gdiplus::Bitmap::FromFile(path);
+    if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+        delete bmp;
+        return nullptr;
+    }
+    return bmp;
+}
+
+void SpriteManager::DrawUiImage(HDC hdc, int uiIdx, int x, int y, int w, int h)
+{
+    if (uiIdx < 0 || uiIdx >= 5) return;
+    Gdiplus::Bitmap* bmp = sUiImages[uiIdx];
+    if (!bmp) return;
+
+    Gdiplus::Graphics g(hdc);
+    g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+    g.DrawImage(bmp, x, y, w, h);
+}
+
+// ---------------------------------------------------------------------------
 // Town NPC drawing
 // ---------------------------------------------------------------------------
 
@@ -382,4 +460,57 @@ void SpriteManager::DrawMonster(HDC hdc, int monType, bool isMoving, int frame,
     g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
     g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
     DrawFrame(g, sheet, frame, totalFrames, destX, destY, drawW, drawH, flipH);
+}
+
+// ---------------------------------------------------------------------------
+// Shop item images (Resource/item/)
+// ---------------------------------------------------------------------------
+
+std::wstring SpriteManager::FindItemDir()
+{
+    WCHAR exeDir[MAX_PATH];
+    GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
+    WCHAR* last = wcsrchr(exeDir, L'\\');
+    if (last) *(last + 1) = L'\0';
+
+    const wchar_t* candidates[] = {
+        L"..\\..\\game\\Resource\\item\\",
+        L"..\\..\\..\\game\\Resource\\item\\",
+        L"game\\Resource\\item\\",
+        L"Resource\\item\\",
+        L"..\\Resource\\item\\",
+    };
+
+    for (const wchar_t* rel : candidates) {
+        WCHAR full[MAX_PATH];
+        swprintf_s(full, MAX_PATH, L"%s%s", exeDir, rel);
+        WCHAR probe[MAX_PATH];
+        swprintf_s(probe, MAX_PATH, L"%spotion.png", full);
+        if (GetFileAttributesW(probe) != INVALID_FILE_ATTRIBUTES)
+            return std::wstring(full);
+    }
+    return L"";
+}
+
+Gdiplus::Bitmap* SpriteManager::LoadItemBmp(const std::wstring& dir, const wchar_t* fileName)
+{
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, MAX_PATH, L"%s%s.png", dir.c_str(), fileName);
+    Gdiplus::Bitmap* bmp = Gdiplus::Bitmap::FromFile(path);
+    if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+        delete bmp;
+        return nullptr;
+    }
+    return bmp;
+}
+
+void SpriteManager::DrawItemImage(HDC hdc, int itemIdx, int x, int y, int w, int h)
+{
+    if (itemIdx < 0 || itemIdx >= 2) return;
+    Gdiplus::Bitmap* bmp = sItemImages[itemIdx];
+    if (!bmp) return;
+
+    Gdiplus::Graphics g(hdc);
+    g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+    g.DrawImage(bmp, x, y, w, h);
 }

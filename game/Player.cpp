@@ -61,6 +61,72 @@ void Player::Update()
         }
     }
 
+    // F key: open/close NPC UI (Ability or Shop)
+    if (Input::GetKeyDown(eKeyCode::F)) {
+        if (mShowAbilityUI) {
+            mShowAbilityUI = false;
+        } else if (mShowShopUI) {
+            mShowShopUI = false;
+        } else if (IsNearAbilityNpc()) {
+            mShowAbilityUI = true;
+        } else if (IsNearShopNpc()) {
+            mShowShopUI = true;
+        }
+    }
+
+    // Shop UI modal: ESC closes, LButton buys item
+    if (mShowShopUI) {
+        if (Input::GetKeyDown(eKeyCode::ESC)) {
+            mShowShopUI = false;
+            return;
+        }
+        if (Input::GetKeyDown(eKeyCode::LButton)) {
+            // Panel: PX=100, PY=90, PW=600, PH=350
+            // Potion slot: col 0, x=200, Scroll slot: col 1, x=450
+            // Buy button rect: y=280, w=120, h=36, centered on colCX
+            const int colCX[2]  = { 250, 550 };
+            const int btnY = 300, btnW = 120, btnH = 36;
+            Vector2 mp = Input::GetMousePosition();
+            for (int i = 0; i < 2; ++i) {
+                int bx = colCX[i] - btnW / 2;
+                if (mp.x >= bx && mp.x <= bx + btnW &&
+                    mp.y >= btnY && mp.y <= btnY + btnH) {
+                    if (i == ITEM_HP_POTION && mPotionCooldown > 0.0f) break;
+                    SendBuyItemPacket((ITEM_TYPE)i);
+                    break;
+                }
+            }
+        }
+        return;
+    }
+
+    // Ability UI modal: ESC closes, LButton invests stat
+    if (mShowAbilityUI) {
+        if (Input::GetKeyDown(eKeyCode::ESC)) {
+            mShowAbilityUI = false;
+            return;
+        }
+        if (Input::GetKeyDown(eKeyCode::LButton) && mStatPoints > 0) {
+            // Plus button rects (x, y, w, h) — must match RenderAbilityUI layout
+            // Panel: x=100, y=90, w=600, h=400
+            // 4 columns centered at x = 175, 325, 475, 625
+            // Plus button top-y = 330, size 40x40
+            const int colCX[4]  = { 175, 325, 475, 625 };
+            const int btnY = 330, btnS = 40;
+            Vector2 mp = Input::GetMousePosition();
+            for (int i = 0; i < 4; ++i) {
+                int bx = colCX[i] - btnS / 2;
+                int by = btnY;
+                if (mp.x >= bx && mp.x <= bx + btnS &&
+                    mp.y >= by && mp.y <= by + btnS) {
+                    SendStatInvestPacket((STAT_TYPE)i);
+                    break;
+                }
+            }
+        }
+        return;
+    }
+
     // Party UI modal: absorbs all other input
     if (mShowPartyUI) {
         if (Input::GetKeyDown(eKeyCode::ESC)) {
@@ -90,11 +156,10 @@ void Player::Update()
         return;
     }
 
-    // Attack cooldown countdown
-    if (mAttackCooldown > 0.0f)
-        mAttackCooldown -= Time::DeltaTime();
-    if (mAoeCooldown > 0.0f)
-        mAoeCooldown -= Time::DeltaTime();
+    // Cooldown countdown
+    if (mAttackCooldown > 0.0f)  mAttackCooldown  -= Time::DeltaTime();
+    if (mAoeCooldown    > 0.0f)  mAoeCooldown     -= Time::DeltaTime();
+    if (mPotionCooldown > 0.0f)  mPotionCooldown  -= Time::DeltaTime();
 
     // Attack: left click, 0.5s cooldown
     if (Input::GetKeyDown(eKeyCode::LButton) && mAttackCooldown <= 0.0f)
@@ -134,7 +199,9 @@ void Player::Update()
     bool anyMove = Input::GetKey(eKeyCode::A) || Input::GetKey(eKeyCode::D) ||
                    Input::GetKey(eKeyCode::W) || Input::GetKey(eKeyCode::S);
     if (anyMove) {
-        mMoveAccum += PLAYER_SPEED * dt;
+        // DEX speed: +5 px/s per DEX above base(5), cap at 400 px/s (8 tiles/s)
+        const int effSpeed = min(PLAYER_SPEED + (mDex - 5) * 5, 400);
+        mMoveAccum += effSpeed * dt;
         int px = (int)mMoveAccum;
         mMoveAccum -= (float)px;
         if (px > 0) {
@@ -307,6 +374,8 @@ void Player::Render(HDC hdc)
     RenderStats(hdc);
     RenderPartyPanel(hdc);
     RenderPartyUI(hdc);
+    RenderAbilityUI(hdc);
+    RenderShopUI(hdc);
 }
 
 void Player::AddObject(int objectId, const std::string& objName, int visualId,
@@ -430,7 +499,7 @@ void Player::RenderObjects(HDC hdc)
         if (obj.object_id >= NPC_ID_START) {
             if (obj.visual_id >= NPC_ABILITY) {
                 // --- Town NPC (Ability / Restaurant / Shop) ---
-                int npcFrame = (GetTickCount() / 200) % 6; // max frames among all types
+                int npcFrame = (int)((GetTickCount() / 200) % 6); // max frames among all types
                 SpriteManager::DrawTownNpc(hdc, obj.visual_id, npcFrame,
                     screenX, screenY, PLAYER_SIZE, PLAYER_SIZE);
 
@@ -456,7 +525,7 @@ void Player::RenderObjects(HDC hdc)
             const int  monCenterY = isBig ? screenY - PLAYER_SIZE / 2 : screenY;
             const int  spriteTop  = monCenterY - drawH / 2;  // top pixel of the sprite
 
-            int monFrame = (GetTickCount() / 150) % MON_IDLE_FRAMES;
+            int monFrame = (int)((GetTickCount() / 150) % MON_IDLE_FRAMES);
             SpriteManager::DrawMonster(hdc, obj.visual_id, obj.isMoving, monFrame,
                 screenX, monCenterY, PLAYER_SIZE, drawH, obj.facingLeft);
 
@@ -473,7 +542,7 @@ void Player::RenderObjects(HDC hdc)
         } else {
             // --- Other Player ---
             int runFrames = obj.isMoving ? SPRITE_RUN_FRAMES : SPRITE_IDLE_FRAMES;
-            int objFrame  = (GetTickCount() / 150) % runFrames;
+            int objFrame  = (int)((GetTickCount() / 150) % runFrames);
             SpriteManager::DrawSprite(hdc, obj.visual_id, obj.isMoving, objFrame,
                 screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
 
@@ -571,7 +640,7 @@ void Player::RenderStats(HDC hdc)
     const int PW = 195;
     const int LH = 18;
 
-    int rows = mStatPoints > 0 ? 5 : 3;
+    int rows = mStatPoints > 0 ? 6 : 4;
 
     HBRUSH bgBrush = CreateSolidBrush(RGB(20, 20, 20));
     HPEN nullPen   = (HPEN)GetStockObject(NULL_PEN);
@@ -596,13 +665,19 @@ void Player::RenderStats(HDC hdc)
     SetTextColor(hdc, mStatPoints > 0 ? RGB(255, 255, 80) : RGB(150, 150, 150));
     TextOutA(hdc, PX + 4, PY + LH * 2, buf, static_cast<int>(strlen(buf)));
 
+    // Gold display
+    SetTextColor(hdc, RGB(255, 210, 60));
+    char goldBuf[32];
+    sprintf_s(goldBuf, "Gold: %d", mGold);
+    TextOutA(hdc, PX + 4, PY + LH * 3, goldBuf, static_cast<int>(strlen(goldBuf)));
+
     if (mStatPoints > 0)
     {
         SetTextColor(hdc, RGB(180, 255, 180));
         const char* hint1 = "1:STR  2:INT";
         const char* hint2 = "3:DEX  4:LUK";
-        TextOutA(hdc, PX + 4, PY + LH * 3, hint1, static_cast<int>(strlen(hint1)));
-        TextOutA(hdc, PX + 4, PY + LH * 4, hint2, static_cast<int>(strlen(hint2)));
+        TextOutA(hdc, PX + 4, PY + LH * 4, hint1, static_cast<int>(strlen(hint1)));
+        TextOutA(hdc, PX + 4, PY + LH * 5, hint2, static_cast<int>(strlen(hint2)));
     }
 }
 
@@ -950,4 +1025,336 @@ void Player::RenderAttackEffects(HDC hdc) const
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Shop NPC proximity check (within 3 tiles)
+// ---------------------------------------------------------------------------
+
+bool Player::IsNearShopNpc() const
+{
+    const int myTileX = GetX() / TILE_SIZE;
+    const int myTileY = GetY() / TILE_SIZE;
+    for (const auto& pair : mRenderList) {
+        const RenderObject& obj = pair.second;
+        if (obj.visual_id != NPC_SHOP) continue;
+        int npcTileX = (int)obj.x / TILE_SIZE;
+        int npcTileY = (int)obj.y / TILE_SIZE;
+        int dx = myTileX - npcTileX;
+        int dy = myTileY - npcTileY;
+        if (dx * dx + dy * dy <= 9)
+            return true;
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Buy item packet
+// ---------------------------------------------------------------------------
+
+void Player::SendBuyItemPacket(ITEM_TYPE itemType)
+{
+    extern void SendBuyItemToServer(ITEM_TYPE t);
+    SendBuyItemToServer(itemType);
+}
+
+// ---------------------------------------------------------------------------
+// Handle buy result from server
+// ---------------------------------------------------------------------------
+
+void Player::OnBuyResult(unsigned char success, ITEM_TYPE item, int gold, int newHp, short newX, short newY)
+{
+    mGold = gold;
+    if (!success) return;
+
+    if (item == ITEM_HP_POTION) {
+        SetHp(newHp);
+        mPotionCooldown = 7.0f;
+    } else if (item == ITEM_TELEPORT_SCROLL) {
+        // Snap to new tile position
+        SetPosition(newX * TILE_SIZE + TILE_SIZE / 2,
+                    newY * TILE_SIZE + TILE_SIZE / 2);
+        mLastSentX = newX;
+        mLastSentY = newY;
+        mShowShopUI = false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shop UI
+// ---------------------------------------------------------------------------
+
+void Player::RenderShopUI(HDC hdc)
+{
+    if (!mShowShopUI) return;
+
+    const int PX = 100, PY = 90, PW = 600, PH = 350;
+
+    HBRUSH bgBrush  = CreateSolidBrush(RGB(20, 30, 20));
+    HPEN   bordPen  = CreatePen(PS_SOLID, 2, RGB(100, 180, 100));
+    HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, bgBrush);
+    HPEN   oldPen   = (HPEN)SelectObject(hdc, bordPen);
+    Rectangle(hdc, PX, PY, PX + PW, PY + PH);
+    SelectObject(hdc, oldBrush); SelectObject(hdc, oldPen);
+    DeleteObject(bgBrush); DeleteObject(bordPen);
+
+    SetBkMode(hdc, TRANSPARENT);
+
+    // Title
+    HFONT titleFont = CreateFontW(22, 0, 0, 0, FW_BOLD, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
+    SetTextColor(hdc, RGB(120, 220, 120));
+    const wchar_t* title = L"[ 상점 ]";
+    TextOutW(hdc, PX + PW / 2 - 50, PY + 12, title, (int)wcslen(title));
+
+    // Gold & close hint
+    HFONT smFont = CreateFontW(15, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    SelectObject(hdc, smFont);
+    wchar_t goldBuf[48];
+    swprintf_s(goldBuf, L"보유 골드: %d G", mGold);
+    SetTextColor(hdc, RGB(255, 210, 60));
+    TextOutW(hdc, PX + 12, PY + 14, goldBuf, (int)wcslen(goldBuf));
+    SetTextColor(hdc, RGB(130, 130, 130));
+    const wchar_t* hint = L"F / ESC: 닫기";
+    TextOutW(hdc, PX + PW - 110, PY + 14, hint, (int)wcslen(hint));
+    DeleteObject(SelectObject(hdc, oldFont));
+
+    // Item columns
+    struct ShopItem {
+        ITEM_TYPE     id;
+        const wchar_t* name;
+        int            price;
+        const wchar_t* desc1;
+        const wchar_t* desc2;
+    };
+    const ShopItem items[2] = {
+        { ITEM_HP_POTION,       L"HP 회복 포션",   SHOP_POTION_PRICE,
+          L"HP를 최대치의 33% 회복",  L"(최소 50 HP)"       },
+        { ITEM_TELEPORT_SCROLL, L"순간이동 주문서", SHOP_TELEPORT_PRICE,
+          L"시작 마을로 즉시 이동",   L"(1000, 1000 타일)"  },
+    };
+
+    const int colCX[2] = { 250, 550 };
+    const int btnY = 300, btnW = 120, btnH = 36;
+
+    HFONT nameFont = CreateFontW(18, 0, 0, 0, FW_BOLD, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT descFont = CreateFontW(14, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+
+    for (int i = 0; i < 2; ++i) {
+        int cx = colCX[i];
+
+        // Divider
+        if (i == 1) {
+            HPEN div = CreatePen(PS_SOLID, 1, RGB(60, 100, 60));
+            HPEN odp = (HPEN)SelectObject(hdc, div);
+            MoveToEx(hdc, PX + PW / 2, PY + 50, nullptr);
+            LineTo(hdc, PX + PW / 2, PY + PH - 20);
+            SelectObject(hdc, odp); DeleteObject(div);
+        }
+
+        // Item icon
+        int iconX = cx - 40, iconY = PY + 65;
+        SpriteManager::DrawItemImage(hdc, i, iconX, iconY, 80, 80);
+
+        // Item name
+        oldFont = (HFONT)SelectObject(hdc, nameFont);
+        SetTextColor(hdc, RGB(200, 230, 200));
+        int nw = (int)wcslen(items[i].name) * 9;
+        TextOutW(hdc, cx - nw / 2, PY + 158, items[i].name, (int)wcslen(items[i].name));
+        SelectObject(hdc, oldFont);   // restore
+
+        // Description
+        oldFont = (HFONT)SelectObject(hdc, descFont);
+        SetTextColor(hdc, RGB(160, 200, 160));
+        int dw1 = (int)wcslen(items[i].desc1) * 7;
+        TextOutW(hdc, cx - dw1 / 2, PY + 186, items[i].desc1, (int)wcslen(items[i].desc1));
+        SetTextColor(hdc, RGB(120, 160, 120));
+        int dw2 = (int)wcslen(items[i].desc2) * 7;
+        TextOutW(hdc, cx - dw2 / 2, PY + 206, items[i].desc2, (int)wcslen(items[i].desc2));
+
+        // Price
+        wchar_t priceBuf[32];
+        swprintf_s(priceBuf, L"%d G", items[i].price);
+        SetTextColor(hdc, RGB(255, 210, 60));
+        int pw2 = (int)wcslen(priceBuf) * 9;
+        TextOutW(hdc, cx - pw2 / 2, PY + 262, priceBuf, (int)wcslen(priceBuf));
+        SelectObject(hdc, oldFont);   // restore
+
+        // Buy button
+        bool onCooldown = (i == ITEM_HP_POTION && mPotionCooldown > 0.0f);
+        bool canBuy     = (mGold >= items[i].price) && !onCooldown;
+        HBRUSH btnBr  = CreateSolidBrush(canBuy ? RGB(40, 160, 40) : RGB(80, 80, 80));
+        HBRUSH oldBtn = (HBRUSH)SelectObject(hdc, btnBr);
+        int bx = cx - btnW / 2;
+        Rectangle(hdc, bx, btnY, bx + btnW, btnY + btnH);
+        SelectObject(hdc, oldBtn); DeleteObject(btnBr);
+
+        oldFont = (HFONT)SelectObject(hdc, smFont);
+        SetTextColor(hdc, canBuy ? RGB(255, 255, 255) : RGB(140, 140, 140));
+        wchar_t btnBuf[16];
+        if (onCooldown)
+            swprintf_s(btnBuf, L"%.1fs", mPotionCooldown);
+        else
+            wcscpy_s(btnBuf, L"구매");
+        int blw = (int)wcslen(btnBuf) * 9;
+        TextOutW(hdc, cx - blw / 2, btnY + 9, btnBuf, (int)wcslen(btnBuf));
+        SelectObject(hdc, oldFont);   // restore
+    }
+
+    DeleteObject(nameFont);
+    DeleteObject(descFont);
+    DeleteObject(smFont);
+    DeleteObject(titleFont);
+}
+
+// ---------------------------------------------------------------------------
+// Ability NPC proximity check (within 3 tiles)
+// ---------------------------------------------------------------------------
+
+bool Player::IsNearAbilityNpc() const
+{
+    const int myTileX = GetX() / TILE_SIZE;
+    const int myTileY = GetY() / TILE_SIZE;
+    for (const auto& pair : mRenderList) {
+        const RenderObject& obj = pair.second;
+        if (obj.visual_id != NPC_ABILITY) continue;
+        int npcTileX = (int)obj.x / TILE_SIZE;
+        int npcTileY = (int)obj.y / TILE_SIZE;
+        int dx = myTileX - npcTileX;
+        int dy = myTileY - npcTileY;
+        if (dx * dx + dy * dy <= 9) // within 3 tiles
+            return true;
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Ability NPC stat investment UI
+// ---------------------------------------------------------------------------
+
+void Player::RenderAbilityUI(HDC hdc)
+{
+    if (!mShowAbilityUI) return;
+
+    // Panel dimensions
+    const int PX = 100, PY = 90, PW = 600, PH = 400;
+
+    // Draw panel background
+    HBRUSH bgBrush  = CreateSolidBrush(RGB(20, 20, 40));
+    HPEN   bordPen  = CreatePen(PS_SOLID, 2, RGB(180, 160, 100));
+    HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, bgBrush);
+    HPEN   oldPen   = (HPEN)SelectObject(hdc, bordPen);
+    Rectangle(hdc, PX, PY, PX + PW, PY + PH);
+    SelectObject(hdc, oldBrush); SelectObject(hdc, oldPen);
+    DeleteObject(bgBrush); DeleteObject(bordPen);
+
+    SetBkMode(hdc, TRANSPARENT);
+
+    // Title
+    HFONT titleFont = CreateFontW(22, 0, 0, 0, FW_BOLD, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
+    SetTextColor(hdc, RGB(255, 220, 80));
+    const wchar_t* title = L"[ 능력치 투자 ]";
+    TextOutW(hdc, PX + PW / 2 - 80, PY + 12, title, (int)wcslen(title));
+    DeleteObject(SelectObject(hdc, oldFont));
+
+    // Stat points remaining
+    HFONT ptFont = CreateFontW(16, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    oldFont = (HFONT)SelectObject(hdc, ptFont);
+    wchar_t ptBuf[64];
+    swprintf_s(ptBuf, L"투자 가능 포인트: %d", (int)mStatPoints);
+    SetTextColor(hdc, mStatPoints > 0 ? RGB(100, 255, 100) : RGB(180, 80, 80));
+    TextOutW(hdc, PX + PW / 2 - 85, PY + 40, ptBuf, (int)wcslen(ptBuf));
+
+    // Close hint
+    SetTextColor(hdc, RGB(150, 150, 150));
+    const wchar_t* hint = L"F / ESC: 닫기";
+    TextOutW(hdc, PX + PW - 100, PY + 12, hint, (int)wcslen(hint));
+    DeleteObject(SelectObject(hdc, oldFont));
+
+    // Per-stat data
+    struct StatInfo {
+        const wchar_t* name;
+        unsigned char  value;
+        const wchar_t* effect1;
+        const wchar_t* effect2;
+    };
+    const StatInfo stats[4] = {
+        { L"STR", mStr,  L"일반 공격력 +3",       L"근접 공격 데미지 증가"  },
+        { L"INT", mIntl, L"기술 데미지 +4",       L"AOE 공격 시 적용"       },
+        { L"DEX", mDex,  L"이동속도 +5px/s",      L"최대 400px/s (8타일/s)" },
+        { L"LUK", mLuk,  L"크리티컬 확률 +1%",   L"크리티컬 배율 x1.5"     },
+    };
+
+    // Column centers
+    const int colCX[4] = { 175, 325, 475, 625 };
+    const int iconY     = 75;   // top of icon relative to PY
+    const int iconSize  = 80;
+    const int btnY      = 330;  // absolute Y of plus button top
+    const int btnSize   = 40;
+
+    HFONT nameFont = CreateFontW(17, 0, 0, 0, FW_BOLD, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT descFont = CreateFontW(13, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+
+    for (int i = 0; i < 4; ++i) {
+        int cx = colCX[i];
+
+        // Divider line between columns
+        if (i > 0) {
+            HPEN divPen = CreatePen(PS_SOLID, 1, RGB(80, 80, 100));
+            HPEN odp = (HPEN)SelectObject(hdc, divPen);
+            MoveToEx(hdc, cx - 75, PY + 65, nullptr);
+            LineTo(hdc, cx - 75, PY + PH - 20);
+            SelectObject(hdc, odp); DeleteObject(divPen);
+        }
+
+        // Stat icon (uiIdx 0-3)
+        SpriteManager::DrawUiImage(hdc, i, cx - iconSize / 2, PY + iconY, iconSize, iconSize);
+
+        // Stat name
+        oldFont = (HFONT)SelectObject(hdc, nameFont);
+        SetTextColor(hdc, RGB(220, 200, 100));
+        TextOutW(hdc, cx - 15, PY + iconY + iconSize + 8, stats[i].name, (int)wcslen(stats[i].name));
+        DeleteObject(SelectObject(hdc, oldFont));
+
+        // Current value
+        oldFont = (HFONT)SelectObject(hdc, descFont);
+        wchar_t valBuf[16];
+        swprintf_s(valBuf, L"%d", (int)stats[i].value);
+        SetTextColor(hdc, RGB(255, 255, 255));
+        TextOutW(hdc, cx - 8, PY + iconY + iconSize + 30, valBuf, (int)wcslen(valBuf));
+
+        // Effect lines
+        SetTextColor(hdc, RGB(160, 220, 160));
+        int ew1 = (int)wcslen(stats[i].effect1) * 7;
+        TextOutW(hdc, cx - ew1 / 2, PY + iconY + iconSize + 52, stats[i].effect1, (int)wcslen(stats[i].effect1));
+        SetTextColor(hdc, RGB(130, 170, 130));
+        int ew2 = (int)wcslen(stats[i].effect2) * 7;
+        TextOutW(hdc, cx - ew2 / 2, PY + iconY + iconSize + 70, stats[i].effect2, (int)wcslen(stats[i].effect2));
+        DeleteObject(SelectObject(hdc, oldFont));
+
+        // Plus button
+        bool canInvest = (mStatPoints > 0);
+        if (canInvest) {
+            SpriteManager::DrawUiImage(hdc, 4,
+                cx - btnSize / 2, btnY, btnSize, btnSize);
+        } else {
+            // Greyed-out rectangle when no points
+            HBRUSH gb  = CreateSolidBrush(RGB(60, 60, 60));
+            HBRUSH ogb = (HBRUSH)SelectObject(hdc, gb);
+            Rectangle(hdc, cx - btnSize/2, btnY, cx + btnSize/2, btnY + btnSize);
+            SelectObject(hdc, ogb); DeleteObject(gb);
+        }
+    }
+
+    DeleteObject(nameFont);
+    DeleteObject(descFont);
 }
