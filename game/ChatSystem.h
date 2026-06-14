@@ -10,6 +10,7 @@ public:
     };
 
     ChatSystem();
+    ~ChatSystem();
 
     void AddMessage(const std::string& sender, const std::string& text);
     void Render(HDC hdc, const std::wstring& inputText);

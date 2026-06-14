@@ -1,7 +1,28 @@
 #include "ChatSystem.h"
 #pragma comment(lib, "Msimg32.lib")
 
-ChatSystem::ChatSystem() : mChatMode(false) {}
+// Convert a UTF-8 multibyte string to UTF-16
+// (project uses /utf-8, so all char strings are UTF-8)
+static std::wstring ToWide(const std::string& s)
+{
+    if (s.empty()) return {};
+    int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
+    if (len <= 0) return {};
+    std::wstring ws(len - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &ws[0], len);
+    return ws;
+}
+
+ChatSystem::ChatSystem() : mChatMode(false)
+{
+    // Load private Korean font so CreateFont can reference it by name
+    AddFontResourceExA("./Resource/Font/NanumBarunGothic.ttf", FR_PRIVATE, nullptr);
+}
+
+ChatSystem::~ChatSystem()
+{
+    RemoveFontResourceExA("./Resource/Font/NanumBarunGothic.ttf", FR_PRIVATE, nullptr);
+}
 
 void ChatSystem::AddMessage(const std::string& sender, const std::string& text)
 {
@@ -23,9 +44,9 @@ void ChatSystem::Render(HDC hdc, const std::wstring& inputText)
         int bgW = CHAT_WIDTH + 2;
         int bgH = bgBottom - bgY;
 
-        HDC    memDC  = CreateCompatibleDC(hdc);
-        HBITMAP memBmp = CreateCompatibleBitmap(hdc, bgW, bgH);
-        HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, memBmp);
+        HDC      memDC  = CreateCompatibleDC(hdc);
+        HBITMAP  memBmp = CreateCompatibleBitmap(hdc, bgW, bgH);
+        HBITMAP  oldBmp = (HBITMAP)SelectObject(memDC, memBmp);
 
         HBRUSH fill = CreateSolidBrush(RGB(10, 10, 25));
         RECT   rc   = { 0, 0, bgW, bgH };
@@ -34,7 +55,7 @@ void ChatSystem::Render(HDC hdc, const std::wstring& inputText)
 
         BLENDFUNCTION bf = {};
         bf.BlendOp             = AC_SRC_OVER;
-        bf.SourceConstantAlpha = 160;  // ~63% opaque
+        bf.SourceConstantAlpha = 160;
         bf.AlphaFormat         = 0;
         AlphaBlend(hdc, bgX, bgY, bgW, bgH, memDC, 0, 0, bgW, bgH, bf);
 
@@ -43,20 +64,34 @@ void ChatSystem::Render(HDC hdc, const std::wstring& inputText)
         DeleteDC(memDC);
     }
 
-    // render messages
+    // NanumBarunGothic with HANGUL_CHARSET for correct Korean glyph mapping
+    HFONT hFont = CreateFontW(
+        14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        HANGUL_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+        L"NanumBarunGothic");
+    HFONT hOldFont = (HFONT)SelectObject(hdc, hFont);
+
     SetTextColor(hdc, RGB(255, 255, 255));
     SetBkMode(hdc, TRANSPARENT);
 
     int i = 0;
-    for (const auto& msg : mMessages) {
-        std::string line = msg.sender + ": " + msg.text;
-        TextOutA(hdc, CHAT_X + 4, MSG_START_Y + i * LINE_HEIGHT,
-                 line.c_str(), static_cast<int>(line.size()));
+    for (const auto& msg : mMessages)
+    {
+        std::wstring wline;
+        if (msg.sender.empty())
+            wline = ToWide(msg.text);
+        else
+            wline = ToWide(msg.sender) + L": " + ToWide(msg.text);
+
+        TextOutW(hdc, CHAT_X + 4, MSG_START_Y + i * LINE_HEIGHT,
+            wline.c_str(), static_cast<int>(wline.size()));
         ++i;
     }
 
-    // input box (visible only in chat mode)
-    if (mChatMode) {
+    // Input box (visible only in chat mode)
+    if (mChatMode)
+    {
         HPEN   borderPen  = CreatePen(PS_SOLID, 1, RGB(200, 200, 200));
         HBRUSH inputBrush = CreateSolidBrush(RGB(40, 40, 40));
         SelectObject(hdc, borderPen);
@@ -65,17 +100,14 @@ void ChatSystem::Render(HDC hdc, const std::wstring& inputText)
         DeleteObject(borderPen);
         DeleteObject(inputBrush);
 
-        // build "> text_" prompt (ASCII only)
-        std::string display = "> ";
-        for (wchar_t c : inputText) {
-            if (c >= 32 && c < 128)
-                display += static_cast<char>(c);
-        }
-        display += '_';
-
+        // inputText is already wstring — Korean renders directly
+        std::wstring display = L"> " + inputText + L"_";
         SetTextColor(hdc, RGB(255, 255, 100));
-        TextOutA(hdc, CHAT_X + 4, INPUT_Y + 2,
-                 display.c_str(), static_cast<int>(display.size()));
+        TextOutW(hdc, CHAT_X + 4, INPUT_Y + 2,
+            display.c_str(), static_cast<int>(display.size()));
         SetTextColor(hdc, RGB(255, 255, 255));
     }
+
+    SelectObject(hdc, hOldFont);
+    DeleteObject(hFont);
 }

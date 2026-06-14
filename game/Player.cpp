@@ -1,11 +1,11 @@
 #include "Player.h"
-#include "Player.h"
 #include "Input.h"
 #include "Game.h"
 #include "Camera.h"
 #include "Time.h"
 #include "SpriteManager.h"
 #include <cmath>
+#include <cstdio>
 #include <algorithm>
 
 // Forward declaration — defined later in this file
@@ -39,7 +39,8 @@ Player::Player()
     mFacingLeft = false;
     mIsMoving   = false;
     mMoveAccum        = 0.0f;
-    // mAvatarPositionSet = false;
+    mSendTimer        = 0.0f;
+    mAvatarPositionSet = false;
 }
 
 Player::~Player()
@@ -95,17 +96,25 @@ void Player::Update()
     if (mAoeCooldown > 0.0f)
         mAoeCooldown -= Time::DeltaTime();
 
-    // Attack: press S, 0.5s cooldown
-    if (Input::GetKeyDown(eKeyCode::S) && mAttackCooldown <= 0.0f)
+    // Attack: left click, 0.5s cooldown
+    if (Input::GetKeyDown(eKeyCode::LButton) && mAttackCooldown <= 0.0f)
     {
-        SendAttackPacket();
-        mAttackCooldown = 0.5f;
+        DIRECTION dir = GetMouseDirection();
+        mLastDirection = dir;
+        mFacingLeft    = (dir == LEFT);
+        SendAttackPacket(dir);
+        mAttackEffects.push_back({ GetX(), GetY(), dir, false, 0.25f, 0.25f });
+        mAttackCooldown = 1.0f;
     }
 
-    // AoE Attack: press A, 3s cooldown
-    if (Input::GetKeyDown(eKeyCode::A) && mAoeCooldown <= 0.0f)
+    // AoE Attack: E key, 3s cooldown
+    if (Input::GetKeyDown(eKeyCode::E) && mAoeCooldown <= 0.0f)
     {
-        SendAoeAttackPacket();
+        DIRECTION dir = GetMouseDirection();
+        mLastDirection = dir;
+        mFacingLeft    = (dir == LEFT);
+        SendAoeAttackPacket(dir);
+        mAttackEffects.push_back({ GetX(), GetY(), dir, true, 0.4f, 0.4f });
         mAoeCooldown = 3.0f;
     }
 
@@ -122,17 +131,17 @@ void Player::Update()
 
     // 4 tiles/s = 200 px/s (TILE_SIZE=50)
     // Accumulate fractional pixels so speed is frame-rate independent
-    bool anyMove = Input::GetKey(eKeyCode::Left)  || Input::GetKey(eKeyCode::Right) ||
-                   Input::GetKey(eKeyCode::Up)     || Input::GetKey(eKeyCode::Down);
+    bool anyMove = Input::GetKey(eKeyCode::A) || Input::GetKey(eKeyCode::D) ||
+                   Input::GetKey(eKeyCode::W) || Input::GetKey(eKeyCode::S);
     if (anyMove) {
         mMoveAccum += PLAYER_SPEED * dt;
         int px = (int)mMoveAccum;
         mMoveAccum -= (float)px;
         if (px > 0) {
-            if (Input::GetKey(eKeyCode::Left))  { SetPosition(GetX() - px, GetY()); mLastDirection = LEFT; }
-            if (Input::GetKey(eKeyCode::Right)) { SetPosition(GetX() + px, GetY()); mLastDirection = RIGHT; }
-            if (Input::GetKey(eKeyCode::Up))    { SetPosition(GetX(), GetY() - px); mLastDirection = UP; }
-            if (Input::GetKey(eKeyCode::Down))  { SetPosition(GetX(), GetY() + px); mLastDirection = DOWN; }
+            if (Input::GetKey(eKeyCode::A)) { SetPosition(GetX() - px, GetY()); mLastDirection = LEFT; }
+            if (Input::GetKey(eKeyCode::D)) { SetPosition(GetX() + px, GetY()); mLastDirection = RIGHT; }
+            if (Input::GetKey(eKeyCode::W)) { SetPosition(GetX(), GetY() - px); mLastDirection = UP; }
+            if (Input::GetKey(eKeyCode::S)) { SetPosition(GetX(), GetY() + px); mLastDirection = DOWN; }
         }
     } else {
         mMoveAccum = 0.0f;
@@ -150,12 +159,12 @@ void Player::Update()
     else if (y > MAP_MAX) SetPosition(x, MAP_MAX);
 
     // Sprite animation — track movement & facing direction
-    bool movingNow = Input::GetKey(eKeyCode::Left)  || Input::GetKey(eKeyCode::Right) ||
-                     Input::GetKey(eKeyCode::Up)     || Input::GetKey(eKeyCode::Down);
+    bool movingNow = Input::GetKey(eKeyCode::A) || Input::GetKey(eKeyCode::D) ||
+                     Input::GetKey(eKeyCode::W) || Input::GetKey(eKeyCode::S);
     mIsMoving = movingNow;
 
-    if (Input::GetKey(eKeyCode::Left))  mFacingLeft = true;
-    if (Input::GetKey(eKeyCode::Right)) mFacingLeft = false;
+    if (Input::GetKey(eKeyCode::A)) mFacingLeft = true;
+    if (Input::GetKey(eKeyCode::D)) mFacingLeft = false;
 
     int numFrames = mIsMoving ? SPRITE_RUN_FRAMES : SPRITE_IDLE_FRAMES;
     mAnimTimer += dt;
@@ -174,8 +183,16 @@ void Player::Update()
             [](const DamageNumber& d) { return d.timeLeft <= 0.0f; }),
         mDamageNumbers.end());
 
+    // Tick attack effects
+    for (auto& fx : mAttackEffects)
+        fx.timeLeft -= dt;
+    mAttackEffects.erase(
+        std::remove_if(mAttackEffects.begin(), mAttackEffects.end(),
+            [](const AttackEffect& fx) { return fx.timeLeft <= 0.0f; }),
+        mAttackEffects.end());
+
     // Smooth interpolation for render objects (monsters & other players)
-    const float MOVE_SPEED = 100.0f; // pixels per second (one tile = 50px, arrives in 0.5s)
+    const float MOVE_SPEED = 200.0f; // pixels per second — matches player's 4 tiles/s
     for (auto& [id, obj] : mRenderList) {
         if (!obj.isMoving) continue;
         float dx   = obj.targetX - obj.x;
@@ -196,22 +213,21 @@ void Player::Update()
 
 void Player::LateUpdate()
 {
-    // ī�޶� �÷��̾� ��ġ�� ������Ʈ
     GAME.GetCamera()->SetTarget(GetX(), GetY());
 
-    // ��ġ ���� ����: �ȼ� ��ǥ�� Ÿ�� ��ǥ�� ��ȯ�Ͽ� ������ ����
+    float dt = Time::DeltaTime();
     int currentTileX = GetX() / TILE_SIZE;
     int currentTileY = GetY() / TILE_SIZE;
+    bool tileChanged = (currentTileX != mLastSentX || currentTileY != mLastSentY);
 
-    if (mLastSentX != currentTileX || mLastSentY != currentTileY)
+    // Send pixel position on tile change OR every 50 ms while moving
+    mSendTimer += dt;
+    if (tileChanged || (mIsMoving && mSendTimer >= 0.05f))
     {
-        // ��ġ�� ����Ǿ����Ƿ� ������ �̵� ��Ŷ ����
-        printf("Tile changed - From: (%d, %d) -> To: (%d, %d), Pixel: (%d, %d)\n", 
-            mLastSentX, mLastSentY, currentTileX, currentTileY, GetX(), GetY());
-        SendMoveToServer(currentTileX, currentTileY);
-
+        SendMoveToServer(GetX(), GetY());
         mLastSentX = currentTileX;
         mLastSentY = currentTileY;
+        mSendTimer = 0.0f;
     }
 }
 
@@ -286,6 +302,7 @@ void Player::Render(HDC hdc)
         DrawHpBar(hdc, screenX, footY + 14, GetHp(), mMaxHp > 0 ? mMaxHp : 1);
     }
 
+    RenderAttackEffects(hdc);
     RenderObjects(hdc);
     RenderStats(hdc);
     RenderPartyPanel(hdc);
@@ -412,18 +429,33 @@ void Player::RenderObjects(HDC hdc)
 
         if (obj.object_id >= NPC_ID_START) {
             // --- Monster ---
+            // Big_Normal renders 2 tiles tall; sprite top is TILE_SIZE above the
+            // normal head, bottom aligns with the actual position tile's bottom edge.
+            // All other measurements (hitbox, server position) remain at the 1-tile center.
+            const bool isBig = (obj.visual_id == MON_BIG_NORMAL);
+            const int  drawH  = isBig ? PLAYER_SIZE * 2 : PLAYER_SIZE;
+            // Shift the draw-center up so that destY = spriteTop = screenY - drawH/2
+            // places the sprite bottom at screenY + PLAYER_SIZE/2 (foot of the tile).
+            // drawCenter = screenY - PLAYER_SIZE/2 + drawH/2 - drawH
+            //            = screenY - PLAYER_SIZE/2 - drawH/2
+            // Simplifies to: for Big: screenY - 25 - 50 = screenY - 75   (sprite top)
+            //                         via DrawMonster: destY = centerY - drawH/2
+            // We want destY = screenY - 75, drawH=100  => centerY = screenY - 75 + 50 = screenY - 25
+            const int  monCenterY = isBig ? screenY - PLAYER_SIZE / 2 : screenY;
+            const int  spriteTop  = monCenterY - drawH / 2;  // top pixel of the sprite
+
             int monFrame = (GetTickCount() / 150) % MON_IDLE_FRAMES;
             SpriteManager::DrawMonster(hdc, obj.visual_id, obj.isMoving, monFrame,
-                screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
+                screenX, monCenterY, PLAYER_SIZE, drawH, obj.facingLeft);
 
-            // HP bar just above the sprite
-            DrawHpBar(hdc, screenX, headTop - 8, obj.hp, obj.max_hp);
+            // HP bar just above the sprite top
+            DrawHpBar(hdc, screenX, spriteTop - 8, obj.hp, obj.max_hp);
 
             // Monster name above the HP bar
             SetTextColor(hdc, RGB(255, 200, 100));
             const std::string& nm = obj.obj_name;
             TextOutA(hdc, screenX - (int)(nm.size() * 4),
-                headTop - 20, nm.c_str(), (int)nm.size());
+                spriteTop - 20, nm.c_str(), (int)nm.size());
 
         } else {
             // --- Other Player ---
@@ -459,14 +491,17 @@ void Player::RenderObjects(HDC hdc)
         char numBuf[16];
         sprintf_s(numBuf, "%d", dn.amount);
         int tx = sx - (int)(strlen(numBuf) * 4);
-        int ty = sy - PLAYER_SIZE / 2 - 30 + (int)dn.offsetY;
+        // Big_Normal sprites are 2 tiles tall — float damage above the full sprite
+        bool isBigMon = (it->second.visual_id == MON_BIG_NORMAL);
+        int  dmgBaseY = isBigMon ? sy - PLAYER_SIZE * 3 / 2 : sy - PLAYER_SIZE / 2;
+        int ty = dmgBaseY - 30 + (int)dn.offsetY;
 
         SetTextColor(hdc, dn.isCrit ? RGB(255, 230, 0) : RGB(255, 255, 255));
         TextOutA(hdc, tx, ty, numBuf, (int)strlen(numBuf));
     }
 }
 
-void Player::AddDamageNumber(int objectId, int damage, bool isCrit)
+void Player::AddDamageNumber(int attackerId, int objectId, int damage, bool isCrit)
 {
     DamageNumber dn;
     dn.objectId = objectId;
@@ -475,6 +510,37 @@ void Player::AddDamageNumber(int objectId, int damage, bool isCrit)
     dn.timeLeft = 0.5f;
     dn.offsetY  = 0.0f;
     mDamageNumbers.push_back(dn);
+
+    // System message only for the local player's hits
+    if (attackerId == playerID)
+    {
+        std::string monName = "Monster";
+        auto it = mRenderList.find(objectId);
+        if (it != mRenderList.end())
+            monName = it->second.obj_name;
+
+        // \uXXXX escapes are encoding-independent — always compile to correct UTF-16
+        // "[system] 플레이어 {id}가 {monster}을(를) 공격해서 {damage} 데미지를 입혔습니다."
+        wchar_t wbuf[256];
+        if (isCrit)
+            swprintf_s(wbuf, 256,
+                L"[system] 플레이어 %d가 %S"
+                L"을(를) 공격해서 %d "
+                L"데미지를 입혔습니다!"
+                L" (크리티컬)",
+                attackerId, monName.c_str(), damage);
+        else
+            swprintf_s(wbuf, 256,
+                L"[system] 플레이어 %d가 %S"
+                L"을(를) 공격해서 %d "
+                L"데미지를 입혔습니다.",
+                attackerId, monName.c_str(), damage);
+
+        // Convert wide string to UTF-8 (matches /utf-8 project encoding)
+        char buf[512];
+        WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, sizeof(buf), nullptr, nullptr);
+        GAME.GetChatSystem()->AddMessage("", std::string(buf));
+    }
 }
 
 std::string Player::GetObjectName(int objectId) const
@@ -533,22 +599,22 @@ void Player::SendStatInvestPacket(STAT_TYPE statType)
     SendStatInvest(statType);
 }
 
-void Player::SendMoveToServer(int tileX, int tileY)
+void Player::SendMoveToServer(int pixelX, int pixelY)
 {
     extern void SendPlayerMovePacket(int x, int y);
-    SendPlayerMovePacket(tileX, tileY);
+    SendPlayerMovePacket(pixelX, pixelY);
 }
 
-void Player::SendAoeAttackPacket()
+void Player::SendAoeAttackPacket(DIRECTION dir)
 {
-    extern void SendAoeAttackToServer();
-    SendAoeAttackToServer();
+    extern void SendAoeAttackToServer(DIRECTION dir);
+    SendAoeAttackToServer(dir);
 }
 
-void Player::SendAttackPacket()
+void Player::SendAttackPacket(DIRECTION dir)
 {
-    extern void SendAttackToServer();
-    SendAttackToServer();
+    extern void SendAttackToServer(DIRECTION dir);
+    SendAttackToServer(dir);
 }
 
 // ---------------------------------------------------------------------------
@@ -752,4 +818,123 @@ void Player::RenderPartyUI(HDC hdc)
     SetTextColor(hdc, RGB(90, 90, 90));
     const char* hint = "Up/Down: navigate    Space: confirm";
     TextOutA(hdc, MX + 10, MY + MH - 22, hint, (int)strlen(hint));
+}
+
+// ---------------------------------------------------------------------------
+// Mouse direction helper
+// ---------------------------------------------------------------------------
+
+DIRECTION Player::GetMouseDirection() const
+{
+    Vector2 mouse = Input::GetMousePosition();
+    Camera* cam = GAME.GetCamera();
+    int screenX, screenY;
+    cam->WorldToScreen(GetX(), GetY(), screenX, screenY);
+    float dx = mouse.x - (float)screenX;
+    float dy = mouse.y - (float)screenY;
+    if (fabsf(dx) >= fabsf(dy))
+        return dx >= 0.0f ? RIGHT : LEFT;
+    else
+        return dy >= 0.0f ? DOWN : UP;
+}
+
+// ---------------------------------------------------------------------------
+// Attack effect rendering (client-side only, GDI+)
+// ---------------------------------------------------------------------------
+
+void Player::RenderAttackEffects(HDC hdc) const
+{
+    if (mAttackEffects.empty()) return;
+
+    Camera* cam = GAME.GetCamera();
+    Gdiplus::Graphics g(hdc);
+    g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+
+    for (const auto& fx : mAttackEffects)
+    {
+        float t = 1.0f - fx.timeLeft / fx.totalTime;  // 0=fresh, 1=expired
+        int   alpha = (int)(240 * (1.0f - t));
+        if (alpha <= 0) continue;
+
+        int cx, cy;
+        cam->WorldToScreen(fx.worldX, fx.worldY, cx, cy);
+
+        if (!fx.isAoe)
+        {
+            // --- Single attack: three concentric slash arcs ---
+            // GDI+ DrawArc: startAngle 0=right, 90=down, counter-clockwise
+            // We want arc facing the attack direction, 90° sweep.
+            float startAngle = 0.0f;
+            switch (fx.dir) {
+            case RIGHT: startAngle = -45.0f; break;
+            case DOWN:  startAngle =  45.0f; break;
+            case LEFT:  startAngle = 135.0f; break;
+            case UP:    startAngle = 225.0f; break;
+            }
+
+            for (int ring = 0; ring < 3; ++ring)
+            {
+                int r = 28 + ring * 16;
+                int pw = 3 - ring;
+                BYTE a = (BYTE)(alpha * (3 - ring) / 3);
+                Gdiplus::Pen pen(Gdiplus::Color(a, 180, 220, 255), (Gdiplus::REAL)pw);
+                g.DrawArc(&pen,
+                    (Gdiplus::REAL)(cx - r), (Gdiplus::REAL)(cy - r),
+                    (Gdiplus::REAL)(r * 2),  (Gdiplus::REAL)(r * 2),
+                    startAngle, 90.0f);
+            }
+
+            // Direction streak lines (5 lines spread ±20°)
+            float dirRad = 0.0f;
+            switch (fx.dir) {
+            case RIGHT: dirRad =  0.0f;                 break;
+            case LEFT:  dirRad =  3.14159f;             break;
+            case UP:    dirRad = -3.14159f / 2.0f;      break;
+            case DOWN:  dirRad =  3.14159f / 2.0f;      break;
+            }
+            Gdiplus::Pen streakPen(Gdiplus::Color((BYTE)alpha, 220, 240, 255), 2.0f);
+            for (int s = -2; s <= 2; ++s)
+            {
+                float a = dirRad + s * (3.14159f / 9.0f);  // ±40° spread
+                int x1 = cx + (int)(12 * cosf(a));
+                int y1 = cy + (int)(12 * sinf(a));
+                int x2 = cx + (int)(55 * cosf(a));
+                int y2 = cy + (int)(55 * sinf(a));
+                g.DrawLine(&streakPen, x1, y1, x2, y2);
+            }
+        }
+        else
+        {
+            // --- AOE: expanding ring + 8 radial slashes ---
+            float progress = t;  // 0→1 as effect plays
+            int   radius   = (int)(80 * progress);
+
+            // Expanding ring
+            Gdiplus::Pen ringPen(Gdiplus::Color((BYTE)alpha, 255, 180, 40), 2.5f);
+            if (radius > 1)
+                g.DrawEllipse(&ringPen, cx - radius, cy - radius, radius * 2, radius * 2);
+
+            // 8 radial slash lines growing outward
+            for (int i = 0; i < 8; ++i)
+            {
+                float angle  = i * (3.14159f / 4.0f);
+                int   minLen = 10 + (int)(20 * progress);
+                int   maxLen = 40 + (int)(45 * progress);
+                int   x1 = cx + (int)(minLen * cosf(angle));
+                int   y1 = cy + (int)(minLen * sinf(angle));
+                int   x2 = cx + (int)(maxLen * cosf(angle));
+                int   y2 = cy + (int)(maxLen * sinf(angle));
+                Gdiplus::Pen slashPen(Gdiplus::Color((BYTE)alpha, 255, 210, 80), 2.0f);
+                g.DrawLine(&slashPen, x1, y1, x2, y2);
+            }
+
+            // Inner burst star (fresh part only)
+            if (t < 0.3f)
+            {
+                int br = (int)(35 * (1.0f - t / 0.3f));
+                Gdiplus::Pen burstPen(Gdiplus::Color((BYTE)(alpha), 255, 255, 160), 3.0f);
+                g.DrawEllipse(&burstPen, cx - br, cy - br, br * 2, br * 2);
+            }
+        }
+    }
 }

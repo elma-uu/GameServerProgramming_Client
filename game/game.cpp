@@ -104,7 +104,11 @@ void Game::Update()
 		std::wstring inputText = Input::GetInputText();
 		if (!inputText.empty())
 		{
-			std::string msg(inputText.begin(), inputText.end());
+			// Convert wide string to UTF-8 for the chat packet
+			int utf8Len = WideCharToMultiByte(CP_UTF8, 0, inputText.c_str(), -1, nullptr, 0, nullptr, nullptr);
+			std::string msg(utf8Len > 0 ? utf8Len - 1 : 0, '\0');
+			if (utf8Len > 0)
+				WideCharToMultiByte(CP_UTF8, 0, inputText.c_str(), -1, &msg[0], utf8Len, nullptr, nullptr);
 			SendChatPacket(msg);
 		}
 		Input::ClearInputText();
@@ -403,27 +407,29 @@ void Game::RenderLoginScreen(HDC hdc)
 	}
 }
 
-void SendAttackToServer()
+void SendAttackToServer(DIRECTION dir)
 {
 	Network* network = GAME.GetNetwork();
 	if (network == nullptr) return;
 	C2S_Attack packet;
 	packet.size = sizeof(C2S_Attack);
 	packet.type = C2S_ATTACK;
+	packet.dir  = dir;
 	network->Send(&packet);
 }
 
-void SendAoeAttackToServer()
+void SendAoeAttackToServer(DIRECTION dir)
 {
 	Network* network = GAME.GetNetwork();
 	if (network == nullptr) return;
 	C2S_AoeAttack packet;
 	packet.size = sizeof(C2S_AoeAttack);
 	packet.type = C2S_AOE_ATTACK;
+	packet.dir  = dir;
 	network->Send(&packet);
 }
 
-void SendPlayerMovePacket(int tileX, int tileY)
+void SendPlayerMovePacket(int pixelX, int pixelY)
 {
 	Network* network = GAME.GetNetwork();
 	if (network != nullptr)
@@ -431,12 +437,11 @@ void SendPlayerMovePacket(int tileX, int tileY)
 		C2S_Move movePacket;
 		movePacket.size = sizeof(C2S_Move);
 		movePacket.type = C2S_MOVE;
-		movePacket.x = tileX;
-		movePacket.y = tileY;
+		movePacket.x = pixelX;
+		movePacket.y = pixelY;
 		movePacket.dir = GAME.GetAvatar()->GetLastDirection();
 		movePacket.move_time = 0;
 		network->Send(&movePacket);
-		printf("Move packet sent to server - Tile: (%d, %d), Direction: %d\n", tileX, tileY, movePacket.dir);
 	}
 }
 

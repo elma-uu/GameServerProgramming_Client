@@ -1,161 +1,189 @@
 #pragma once
-#pragma once
 
 #include "Object.h"
 #include "protocol_2026.h"
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 class Player : public Object
 {
 public:
-	Player();
-	~Player();
-	virtual void Update() override;
-	virtual void LateUpdate() override;
-	virtual void Render(HDC hdc) override;
+    Player();
+    ~Player();
+    virtual void Update()          override;
+    virtual void LateUpdate()      override;
+    virtual void Render(HDC hdc)   override;
 
-	// Setter for Packet Process
-	void SetPlayerInfo
-	(const int& id, const int& x, const int& y, const int& hp
-		, const int& max_hp, const unsigned long long& exp, const unsigned char& level)
-	{
-		playerID = id;
-		SetPosition(x, y);
-		SetHp(hp);
-		mMaxHp = max_hp;
-		mExp = exp;
-		mLevel = level;
-	}
+    // Initial player info from server
+    void SetPlayerInfo(const int& id, const int& x, const int& y,
+        const int& hp, const int& max_hp,
+        const unsigned long long& exp, const unsigned char& level)
+    {
+        playerID = id;
+        SetPosition(x, y);
+        SetHp(hp);
+        mMaxHp  = max_hp;
+        mExp    = exp;
+        mLevel  = level;
+    }
 
-	// Object management for render list
-	void AddObject(int objectId, const std::string& objName, int visualId, 
-		int x, int y, int hp, int max_hp, unsigned long long exp, unsigned char level);
-	void RemoveObject(int objectId);
-	void UpdateObjectPosition(int objectId, int x, int y);
-	void UpdateObjectStatus(int objectId, int hp, int max_hp, unsigned long long exp, unsigned char level);
-	void RenderObjects(HDC hdc);
-	void SendMoveToServer(int tileX, int tileY);
+    // Render-list management
+    void AddObject(int objectId, const std::string& objName, int visualId,
+        int x, int y, int hp, int max_hp,
+        unsigned long long exp, unsigned char level);
+    void RemoveObject(int objectId);
+    void UpdateObjectPosition(int objectId, int x, int y);
+    void UpdateObjectStatus(int objectId, int hp, int max_hp,
+        unsigned long long exp, unsigned char level);
+    void RenderObjects(HDC hdc);
 
-	int GetPlayerID() const { return playerID; }
-	DIRECTION GetLastDirection() const { return mLastDirection; }
-	std::string GetObjectName(int objectId) const;
+    // Network sends
+    void SendMoveToServer(int pixelX, int pixelY);
+    void SendAttackPacket(DIRECTION dir);
+    void SendAoeAttackPacket(DIRECTION dir);
+    void SendStatInvestPacket(STAT_TYPE statType);
 
-	void SetStatInfo(unsigned char str, unsigned char intl,
-		unsigned char dex, unsigned char luk, unsigned char points)
-	{
-		mStr = str; mIntl = intl; mDex = dex; mLuk = luk; mStatPoints = points;
-	}
-	void RenderStats(HDC hdc);
-	void SendStatInvestPacket(STAT_TYPE statType);
-	void SendAttackPacket();
-	void SendAoeAttackPacket();
+    // Getters
+    int       GetPlayerID()       const { return playerID; }
+    DIRECTION GetLastDirection()  const { return mLastDirection; }
+    std::string GetObjectName(int objectId) const;
 
-	// Visual / sprite
-	void SetMyVisualId(int id) { mVisualId = id; }
+    void SetStatInfo(unsigned char str, unsigned char intl,
+        unsigned char dex, unsigned char luk, unsigned char points)
+    {
+        mStr = str; mIntl = intl; mDex = dex; mLuk = luk; mStatPoints = points;
+    }
+    void RenderStats(HDC hdc);
 
-	// In-game stat update (no position snap)
-	void UpdateAvatarStats(int hp, int maxHp, unsigned long long exp, unsigned char level)
-	{
-		SetHp(hp); mMaxHp = maxHp; mExp = exp; mLevel = level;
-	}
+    // Visual / sprite
+    void SetMyVisualId(int id) { mVisualId = id; }
 
-	// First AVATAR_INFO sets position; subsequent ones only update stats
-	bool IsAvatarPositionSet() const { return mAvatarPositionSet; }
-	void MarkAvatarPositionSet()      { mAvatarPositionSet = true; }
+    // In-game stat update (no position snap)
+    void UpdateAvatarStats(int hp, int maxHp,
+        unsigned long long exp, unsigned char level)
+    {
+        SetHp(hp); mMaxHp = maxHp; mExp = exp; mLevel = level;
+    }
 
-	// Floating damage numbers
-	void AddDamageNumber(int objectId, int damage, bool isCrit);
+    // First AVATAR_INFO sets position; subsequent ones only update stats
+    bool IsAvatarPositionSet() const  { return mAvatarPositionSet; }
+    void MarkAvatarPositionSet()       { mAvatarPositionSet = true; }
 
-	// Party
-	void SetMyUsername(const std::string& name) { mMyUsername = name; }
-	void OnPartyUpdate(int partyId, int memberCount, PartyMemberInfo* members);
-	void OnPartyList(int count, PartyListEntry* entries);
-	void RenderPartyPanel(HDC hdc);
-	void RenderPartyUI(HDC hdc);
-	void SendPartyCreate();
-	void SendPartyJoin(int partyId);
-	void SendPartyLeave();
-	void SendPartyListReq();
+    // Floating damage numbers + system chat message
+    void AddDamageNumber(int attackerId, int objectId, int damage, bool isCrit);
+
+    // Party
+    void SetMyUsername(const std::string& name) { mMyUsername = name; }
+    void OnPartyUpdate(int partyId, int memberCount, PartyMemberInfo* members);
+    void OnPartyList(int count, PartyListEntry* entries);
+    void RenderPartyPanel(HDC hdc);
+    void RenderPartyUI(HDC hdc);
+    void SendPartyCreate();
+    void SendPartyJoin(int partyId);
+    void SendPartyLeave();
+    void SendPartyListReq();
 
 private:
-	struct DamageNumber
-	{
-		int   objectId;
-		int   amount;
-		bool  isCrit;
-		float timeLeft;  // seconds until disappear
-		float offsetY;   // pixel drift upward over time
-	};
+    // --- nested types ---
+    struct AttackEffect
+    {
+        int       worldX;
+        int       worldY;
+        DIRECTION dir;
+        bool      isAoe;
+        float     timeLeft;
+        float     totalTime;
+    };
 
-	struct RenderObject
-	{
-		int object_id;
-		std::string obj_name;
-		int visual_id;
-		float x, y;           // current interpolated screen-pixel position
-		float targetX, targetY; // server-provided destination
-		bool  isMoving;       // true while sliding toward target
-		bool  facingLeft;     // true when last horizontal movement was leftward
-		int hp;
-		int max_hp;
-		unsigned long long exp;
-		unsigned char level;
-	};
+    struct DamageNumber
+    {
+        int   objectId;
+        int   amount;
+        bool  isCrit;
+        float timeLeft;
+        float offsetY;
+    };
 
-	struct PartyMember
-	{
-		int   player_id;
-		char  name[MAX_NAME_LEN];
-		int   hp;
-		int   max_hp;
-		unsigned char level;
-	};
+    struct RenderObject
+    {
+        int                object_id  = 0;
+        std::string        obj_name;
+        int                visual_id  = 0;
+        float              x          = 0.0f;
+        float              y          = 0.0f;
+        float              targetX    = 0.0f;
+        float              targetY    = 0.0f;
+        bool               isMoving   = false;
+        bool               facingLeft = false;
+        int                hp         = 0;
+        int                max_hp     = 0;
+        unsigned long long exp        = 0;
+        unsigned char      level      = 1;
+    };
 
-	struct PartyUIEntry
-	{
-		int   party_id;
-		char  leader_name[MAX_NAME_LEN];
-		unsigned char member_count;
-	};
+    struct PartyMember
+    {
+        int   player_id = 0;
+        char  name[MAX_NAME_LEN];
+        int   hp     = 0;
+        int   max_hp = 0;
+        unsigned char level = 1;
+    };
 
-	int playerID;
-	int mVisualId; // for future use (different visual appearances)
-	int mX;
-	int mY;
-	int mHp;
-	int mMaxHp;
-	unsigned long long mExp;
-	unsigned char mLevel;
-	unsigned char mStr;
-	unsigned char mIntl;
-	unsigned char mDex;
-	unsigned char mLuk;
-	unsigned char mStatPoints;
-	std::unordered_map<int, RenderObject> mRenderList;
-	std::vector<DamageNumber>             mDamageNumbers;
+    struct PartyUIEntry
+    {
+        int   party_id     = 0;
+        char  leader_name[MAX_NAME_LEN];
+        unsigned char member_count = 0;
+    };
 
-	// Movement / position tracking
-	int mLastSentX;
-	int mLastSentY;
-	DIRECTION mLastDirection;
-	float mAttackCooldown;
-	float mAoeCooldown;
+    // --- private helpers ---
+    DIRECTION GetMouseDirection()      const;
+    void      RenderAttackEffects(HDC hdc) const;
 
-	// Sprite animation
-	int   mAnimFrame;
-	float mAnimTimer;
-	bool  mFacingLeft;
-	bool  mIsMoving;
-	float mMoveAccum;
-	bool  mAvatarPositionSet;
+    // --- data members ---
+    int                playerID  = -1;
+    int                mVisualId =  0;
+    int                mX        =  0;
+    int                mY        =  0;
+    int                mHp       =  100;
+    int                mMaxHp    =  100;
+    unsigned long long mExp      =  0;
+    unsigned char      mLevel    =  1;
+    unsigned char      mStr      =  5;
+    unsigned char      mIntl     =  5;
+    unsigned char      mDex      =  5;
+    unsigned char      mLuk      =  5;
+    unsigned char      mStatPoints = 0;
 
-	// Party state
-	int                      mPartyId;
-	std::vector<PartyMember> mPartyMembers;
-	bool                     mShowPartyUI;
-	int                      mPartyUISelection;
-	std::vector<PartyUIEntry> mPartyList;
-	std::string              mMyUsername;
+    std::unordered_map<int, RenderObject> mRenderList;
+    std::vector<DamageNumber>             mDamageNumbers;
+    std::vector<AttackEffect>             mAttackEffects;
+
+    // Movement / position tracking
+    int       mLastSentX    = 1000;
+    int       mLastSentY    = 1000;
+    DIRECTION mLastDirection = UP;
+    float     mAttackCooldown = 0.0f;
+    float     mAoeCooldown    = 0.0f;
+    float     mSendTimer      = 0.0f;
+
+    // Sprite animation
+    int   mAnimFrame  = 0;
+    float mAnimTimer  = 0.0f;
+    bool  mFacingLeft = false;
+    bool  mIsMoving   = false;
+    float mMoveAccum  = 0.0f;
+
+    // State flags
+    bool mAvatarPositionSet = false;
+
+    // Party state
+    int                       mPartyId          = -1;
+    std::vector<PartyMember>  mPartyMembers;
+    bool                      mShowPartyUI      = false;
+    int                       mPartyUISelection = -1;
+    std::vector<PartyUIEntry> mPartyList;
+    std::string               mMyUsername;
 };
-

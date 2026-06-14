@@ -144,23 +144,16 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_MOVE_OBJECT:
 	{
 		S2C_MoveObject* packet = reinterpret_cast<S2C_MoveObject*>(recv_packet);
-		// �������� ���� Ÿ�� ��ǥ(x, y)�� �ȼ� ��ǥ�� ��ȯ (Ÿ�� ũ��: 50)
-		// Ÿ�� ����: Ÿ�� �߽� = Ÿ�Ϲ�ȣ * 50 + 25
-		int pixelX = packet->x * 50 + 25;
-		int pixelY = packet->y * 50 + 25;
+		// coords are now pixel coordinates (players) or tile*50+25 (NPCs)
+		int pixelX = packet->x;
+		int pixelY = packet->y;
 
-		// �÷��̾� �ڽ��� ��� SetPosition���� ���� ������Ʈ
-		if (packet->object_id == GAME.GetAvatar()->GetPlayerID())
+		if (packet->object_id != GAME.GetAvatar()->GetPlayerID())
 		{
-			GAME.GetAvatar()->SetPosition(pixelX, pixelY);
-			printf("Player moved - Tile: (%d, %d) -> Pixel: (%d, %d)\n", packet->x, packet->y, pixelX, pixelY);
-		}
-		else
-		{
-			// �ٸ� ��ü�� �̵��� ���� ����Ʈ���� ������Ʈ
+			// Other objects: update interpolation target
 			GAME.GetAvatar()->UpdateObjectPosition(packet->object_id, pixelX, pixelY);
-			printf("Object moved - ID: %d, Tile: (%d, %d) -> Pixel: (%d, %d)\n", packet->object_id, packet->x, packet->y, pixelX, pixelY);
 		}
+		// Own player: local client is authoritative — ignore server echo
 	}
 	break;
 	case S2C_CHAT_MESSAGE:
@@ -216,7 +209,7 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_DAMAGE_NUMBER:
 	{
 		S2C_DamageNumber* pkt = reinterpret_cast<S2C_DamageNumber*>(recv_packet);
-		GAME.GetAvatar()->AddDamageNumber(pkt->object_id, pkt->damage, pkt->is_crit != 0);
+		GAME.GetAvatar()->AddDamageNumber(pkt->attacker_id, pkt->object_id, pkt->damage, pkt->is_crit != 0);
 	}
 	break;
 	default:
