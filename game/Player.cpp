@@ -4,6 +4,7 @@
 #include "Game.h"
 #include "Camera.h"
 #include "Time.h"
+#include "SpriteManager.h"
 
 // �� �����Ӵ� �̵� �Ÿ� (�׽�Ʈ��)
 // 60FPS ����: 200�ȼ�/�� �� 60fps = �� 3.33�ȼ�/������
@@ -26,6 +27,11 @@ Player::Player()
     mPartyId = -1;
     mShowPartyUI = false;
     mPartyUISelection = -1;
+    mVisualId   = 0;
+    mAnimFrame  = 0;
+    mAnimTimer  = 0.0f;
+    mFacingLeft = false;
+    mIsMoving   = false;
 }
 
 Player::~Player()
@@ -125,7 +131,7 @@ void Player::Update()
         mLastDirection = DOWN;
     }
 
-    // �� ���� ���� (2000x2000 Ÿ�� = 100,000x100,000 �ȼ�)
+    // Map boundary clamp (2000x2000 tiles = 100,000x100,000 pixels)
     const int MAP_MAX = 100000;
     int x = GetX();
     int y = GetY();
@@ -135,6 +141,21 @@ void Player::Update()
 
     if (y < 0) SetPosition(x, 0);
     else if (y > MAP_MAX) SetPosition(x, MAP_MAX);
+
+    // Sprite animation — track movement & facing direction
+    bool movingNow = Input::GetKey(eKeyCode::Left)  || Input::GetKey(eKeyCode::Right) ||
+                     Input::GetKey(eKeyCode::Up)     || Input::GetKey(eKeyCode::Down);
+    mIsMoving = movingNow;
+
+    if (Input::GetKey(eKeyCode::Left))  mFacingLeft = true;
+    if (Input::GetKey(eKeyCode::Right)) mFacingLeft = false;
+
+    int numFrames = mIsMoving ? SPRITE_RUN_FRAMES : SPRITE_IDLE_FRAMES;
+    mAnimTimer += Time::DeltaTime();
+    if (mAnimTimer >= 0.1f) {
+        mAnimTimer = 0.0f;
+        mAnimFrame = (mAnimFrame + 1) % numFrames;
+    }
 }
 
 void Player::LateUpdate()
@@ -165,17 +186,9 @@ void Player::Render(HDC hdc)
     camera->WorldToScreen(GetX(), GetY(), screenX, screenY);
 
     // �÷��̾ ȭ�鿡 �׸��� (�簢��) - ���
-    HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
-    HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, whiteBrush);
-
-    Rectangle(hdc,
-        screenX - PLAYER_SIZE / 2,
-        screenY - PLAYER_SIZE / 2,
-        screenX + PLAYER_SIZE / 2,
-        screenY + PLAYER_SIZE / 2);
-
-    SelectObject(hdc, oldBrush);
-    DeleteObject(whiteBrush);
+    // Draw player sprite (fallback to coloured rect if sprites not loaded)
+    SpriteManager::DrawSprite(hdc, mVisualId, mIsMoving, mAnimFrame,
+        screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, mFacingLeft);
 
     SetBkMode(hdc, TRANSPARENT);
 
@@ -270,18 +283,21 @@ void Player::RenderObjects(HDC hdc)
         int screenX, screenY;
         camera->WorldToScreen(obj.x, obj.y, screenX, screenY);
 
-        // ��ü�� ȭ�鿡 �׸��� (�簢��) - �Ķ��� (�÷��̾�� ����)
-        HBRUSH blueBrush = CreateSolidBrush(RGB(0, 0, 255));
-        HBRUSH oldBrush = (HBRUSH)SelectObject(hdc, blueBrush);
-
-        Rectangle(hdc,
-            screenX - PLAYER_SIZE / 2,
-            screenY - PLAYER_SIZE / 2,
-            screenX + PLAYER_SIZE / 2,
-            screenY + PLAYER_SIZE / 2);
-
-        SelectObject(hdc, oldBrush);
-        DeleteObject(blueBrush);
+        if (obj.object_id >= NPC_ID_START) {
+            // Monster: keep as colored rectangle (no sprite yet)
+            HBRUSH br = CreateSolidBrush(RGB(220, 100, 50));
+            HBRUSH ob = (HBRUSH)SelectObject(hdc, br);
+            Rectangle(hdc,
+                screenX - PLAYER_SIZE / 2, screenY - PLAYER_SIZE / 2,
+                screenX + PLAYER_SIZE / 2, screenY + PLAYER_SIZE / 2);
+            SelectObject(hdc, ob);
+            DeleteObject(br);
+        } else {
+            // Player: draw their chosen character sprite
+            int objFrame = (GetTickCount() / 150) % SPRITE_IDLE_FRAMES;
+            SpriteManager::DrawSprite(hdc, obj.visual_id, false, objFrame,
+                screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, false);
+        }
 
         SetBkMode(hdc, TRANSPARENT);
 

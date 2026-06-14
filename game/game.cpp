@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "Input.h"
 #include "Network.h"
+#include "SpriteManager.h"
 
 
 Game::Game()
@@ -13,11 +14,13 @@ Game::Game()
 	, mBackBitmap(NULL)
 	, mNetwork(nullptr)
 	, mState(GameState::LOGIN)
+	, mCharSelectIdx(0)
 {
 }
 
 Game::~Game()
 {
+	SpriteManager::Shutdown();
 	if (mNetwork != nullptr)
 	{
 		delete mNetwork;
@@ -34,6 +37,7 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 	mMap.Initialize(2000, 2000, 50);
 	mMiniMap.Initialize(2000, 2000, 50);
 	mAvatar.SetPosition(50025, 50025);
+	SpriteManager::Init();
 
 	// Connect to server but do NOT send login yet — wait for the login screen
 	mNetwork = new Network();
@@ -78,6 +82,19 @@ void Game::Update()
 		return; // skip game update while in login screen
 	}
 
+	if (mState == GameState::CHAR_SELECT)
+	{
+		if (Input::GetKeyDown(eKeyCode::Left)  && mCharSelectIdx > 0)            mCharSelectIdx--;
+		if (Input::GetKeyDown(eKeyCode::Right) && mCharSelectIdx < CHAR_COUNT-1) mCharSelectIdx++;
+		if (Input::GetKeyDown(eKeyCode::Key1)) mCharSelectIdx = 0;
+		if (Input::GetKeyDown(eKeyCode::Key2)) mCharSelectIdx = 1;
+		if (Input::GetKeyDown(eKeyCode::Key3)) mCharSelectIdx = 2;
+		if (Input::GetKeyDown(eKeyCode::Key4)) mCharSelectIdx = 3;
+		if (Input::GetKeyDown(eKeyCode::Key5)) mCharSelectIdx = 4;
+		if (Input::GetKeyDown(eKeyCode::SPACE)) OnCharSelected(mCharSelectIdx);
+		return;
+	}
+
 	// PLAYING state
 	mAvatar.Update();
 	mCamera.Update();
@@ -108,6 +125,13 @@ void Game::Render()
 	if (mState == GameState::LOGIN)
 	{
 		RenderLoginScreen(mBackHdc);
+		copyRenderTarget(mBackHdc, mHdc);
+		return;
+	}
+
+	if (mState == GameState::CHAR_SELECT)
+	{
+		RenderCharSelectScreen(mBackHdc);
 		copyRenderTarget(mBackHdc, mHdc);
 		return;
 	}
@@ -207,9 +231,104 @@ void Game::SendLoginPacket(const std::string& id, const std::string& pw)
 
 void Game::OnLoginSuccess()
 {
+	// New user — show character selection screen
+	mState = GameState::CHAR_SELECT;
+	mCharSelectIdx = 0;
+	Input::SetLoginMode(false);
+	mLoginMessage.clear();
+}
+
+void Game::OnLoginDirect()
+{
+	// Existing user — visual_id arrives via S2C_AVATAR_INFO, go straight to PLAYING
 	mState = GameState::PLAYING;
 	Input::SetLoginMode(false);
 	mLoginMessage.clear();
+}
+
+void Game::OnCharSelected(int charId)
+{
+	mAvatar.SetMyVisualId(charId);
+	SendCharSelectPacket(charId);
+	mState = GameState::PLAYING;
+}
+
+void Game::RenderCharSelectScreen(HDC hdc)
+{
+	// Background
+	HBRUSH bgBrush = CreateSolidBrush(RGB(8, 10, 30));
+	HPEN nullPen    = (HPEN)GetStockObject(NULL_PEN);
+	HBRUSH ob = (HBRUSH)SelectObject(hdc, bgBrush);
+	HPEN   op = (HPEN)SelectObject(hdc, nullPen);
+	Rectangle(hdc, 0, 0, 800, 600);
+	SelectObject(hdc, ob); SelectObject(hdc, op);
+	DeleteObject(bgBrush);
+
+	SetBkMode(hdc, TRANSPARENT);
+
+	// Title
+	SetTextColor(hdc, RGB(120, 180, 255));
+	const char* title = "== Select Your Character ==";
+	TextOutA(hdc, 270, 30, title, (int)strlen(title));
+
+	// Sub-hint
+	SetTextColor(hdc, RGB(90, 90, 130));
+	const char* sub = "Left / Right  or  1-4  to navigate     Space to confirm";
+	TextOutA(hdc, 170, 555, sub, (int)strlen(sub));
+
+	static const char* kCharNames[CHAR_COUNT] = {
+		"Base", "Alice", "Metal Plate", "Pickaxe", "Red Lotus"
+	};
+
+	// 5 character slots evenly across 800 px
+	const int previewW = 80, previewH = 80;
+	const int centerY  = 280;
+	const int slotW    = 800 / CHAR_COUNT;   // 160 px per slot
+
+	for (int i = 0; i < CHAR_COUNT; ++i) {
+		int cx = slotW / 2 + i * slotW;
+		int cy = centerY;
+
+		bool selected = (i == mCharSelectIdx);
+
+		// Selection border
+		HPEN   selPen = CreatePen(PS_SOLID, selected ? 3 : 1,
+		                          selected ? RGB(255, 220, 60) : RGB(50, 60, 100));
+		HBRUSH selBg  = CreateSolidBrush(selected ? RGB(30, 30, 80) : RGB(15, 15, 40));
+		HBRUSH obr = (HBRUSH)SelectObject(hdc, selBg);
+		HPEN   opn = (HPEN)SelectObject(hdc, selPen);
+		Rectangle(hdc, cx - previewW/2 - 6, cy - previewH/2 - 6,
+		               cx + previewW/2 + 6, cy + previewH/2 + 6);
+		SelectObject(hdc, obr); SelectObject(hdc, opn);
+		DeleteObject(selPen); DeleteObject(selBg);
+
+		// Character sprite preview
+		SpriteManager::DrawPreview(hdc, i, cx, cy, previewW);
+
+		// Character name
+		SetTextColor(hdc, selected ? RGB(255, 220, 60) : RGB(160, 160, 200));
+		const char* name = kCharNames[i];
+		int nameX = cx - (int)(strlen(name) * 4);
+		TextOutA(hdc, nameX, cy + previewH/2 + 14, name, (int)strlen(name));
+
+		// Number hint below name
+		SetTextColor(hdc, RGB(70, 70, 100));
+		char numHint[4];
+		if (i < 4) {
+			sprintf_s(numHint, "[%d]", i + 1);
+			TextOutA(hdc, cx - 10, cy + previewH/2 + 30, numHint, (int)strlen(numHint));
+		}
+	}
+}
+
+void Game::SendCharSelectPacket(int charId)
+{
+	if (mNetwork == nullptr) return;
+	C2S_CharSelect pkt;
+	pkt.size      = sizeof(C2S_CharSelect);
+	pkt.type      = C2S_CHAR_SELECT;
+	pkt.visual_id = static_cast<unsigned char>(charId);
+	mNetwork->Send(&pkt);
 }
 
 void Game::RenderLoginScreen(HDC hdc)

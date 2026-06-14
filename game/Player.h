@@ -50,6 +50,9 @@ public:
 	void SendAttackPacket();
 	void SendAoeAttackPacket();
 
+	// Visual / sprite
+	void SetMyVisualId(int id) { mVisualId = id; }
+
 	// Party
 	void SetMyUsername(const std::string& name) { mMyUsername = name; }
 	void OnPartyUpdate(int partyId, int memberCount, PartyMemberInfo* members);
@@ -106,12 +109,18 @@ private:
 	unsigned char mStatPoints;
 	std::unordered_map<int, RenderObject> mRenderList;
 
-	// ���� ��ġ ���� (��ġ ���� �� ������ �˸�)
+	// Movement / position tracking
 	int mLastSentX;
 	int mLastSentY;
 	DIRECTION mLastDirection;
 	float mAttackCooldown;
 	float mAoeCooldown;
+
+	// Sprite animation
+	int   mAnimFrame;
+	float mAnimTimer;
+	bool  mFacingLeft;
+	bool  mIsMoving;
 
 	// Party state
 	int                      mPartyId;

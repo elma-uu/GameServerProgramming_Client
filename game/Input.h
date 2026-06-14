@@ -21,7 +21,7 @@ enum class eKeyCode
     Z, X, C, V, B, N, M,
     Left, Right, Down, Up,
     LButton, MButton, RButton, SPACE, ESC, BACK,
-    Key1, Key2, Key3, Key4,
+    Key1, Key2, Key3, Key4, Key5,
     End
 };
 

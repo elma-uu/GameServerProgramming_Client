@@ -11,7 +11,7 @@
 
 class Network;  // Forward declaration
 
-enum class GameState { LOGIN, PLAYING };
+enum class GameState { LOGIN, CHAR_SELECT, PLAYING };
 
 class Game
 {
@@ -32,9 +32,11 @@ public:
 	ChatSystem* GetChatSystem() { return &mChatSystem; }
 	void SendChatPacket(const std::string& msg);
 
-	// Login state
+	// State accessors
 	GameState GetGameState() const { return mState; }
-	void OnLoginSuccess();
+	void OnLoginSuccess();           // new user: auth ok → show char-select screen
+	void OnLoginDirect();            // existing user: auth ok → PLAYING immediately
+	void OnCharSelected(int charId); // char chosen → send packet → PLAYING
 	void SetLoginMessage(const std::string& msg) { mLoginMessage = msg; }
 
 private:
@@ -44,7 +46,9 @@ private:
 	void createBuffer(UINT width, UINT height);
 	void initializeEtc();
 	void RenderLoginScreen(HDC hdc);
+	void RenderCharSelectScreen(HDC hdc);
 	void SendLoginPacket(const std::string& id, const std::string& pw);
+	void SendCharSelectPacket(int charId);
 
 private:
 	HWND mHwnd;
@@ -65,6 +69,7 @@ private:
 
 	GameState   mState;
 	std::string mLoginMessage;
+	int         mCharSelectIdx;   // 0-4, current selection on char-select screen
 };
 
 

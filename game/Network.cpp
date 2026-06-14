@@ -84,9 +84,15 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_LOGIN_RESULT:
 	{
 		S2C_LoginResult* packet = reinterpret_cast<S2C_LoginResult*>(recv_packet);
-		if (packet->result == LOGIN_SUCCESS || packet->result == LOGIN_NEW_USER)
+		if (packet->result == LOGIN_NEW_USER)
 		{
+			// First-ever login → show character selection
 			GAME.OnLoginSuccess();
+		}
+		else if (packet->result == LOGIN_SUCCESS)
+		{
+			// Returning user with saved character → enter game directly
+			GAME.OnLoginDirect();
 		}
 		else
 		{
@@ -101,9 +107,11 @@ void Network::ProcessPacket(char* recv_packet)
 		// Ÿ�� ����: Ÿ�� �߽� = Ÿ�Ϲ�ȣ * 50 + 25
 		int pixelX = packet->x * 50 + 25;
 		int pixelY = packet->y * 50 + 25;
-		GAME.GetAvatar()
-			->SetPlayerInfo(packet->playerId, pixelX, pixelY, packet->hp, packet->max_hp, packet->exp, packet->level);
-		printf("Avatar info received - Tile: (%d, %d) -> Pixel: (%d, %d)\n", packet->x, packet->y, pixelX, pixelY);
+		GAME.GetAvatar()->SetPlayerInfo(packet->playerId, pixelX, pixelY,
+			packet->hp, packet->max_hp, packet->exp, packet->level);
+		GAME.GetAvatar()->SetMyVisualId(packet->visualId);
+		printf("Avatar info received - Tile: (%d, %d) -> Pixel: (%d, %d), visual=%d\n",
+			packet->x, packet->y, pixelX, pixelY, packet->visualId);
 	}
 	break;
 	case S2C_ADD_OBJECT:
