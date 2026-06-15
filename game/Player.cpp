@@ -404,30 +404,53 @@ void Player::RenderLayer1(HDC hdc)
 
     RenderObjects(hdc);  // other players, monsters, HP bars, damage numbers
 
-    // Boss laser — visible when any hand's attack frame >= 10 and laser Y is known
-    if (mLaserCenterY >= 0) {
-        // Find a hand in attack state to read the current frame
-        int laserFrame = -1;
-        int leftHandScreenX = 0, rightHandScreenX = 0;
-        for (auto& [id, obj] : mRenderList) {
-            if (obj.visual_id != VISUAL_BOSS_BELIAL_HAND_L &&
-                obj.visual_id != VISUAL_BOSS_BELIAL_HAND_R) continue;
-            if (obj.handAnimState == 1 && obj.handAttackFrame >= 10) {
-                laserFrame = min(obj.handAttackFrame - 10, 6);
-            }
-            // Track screen X of each hand for head placement
-            int hsx, hsy;
-            camera->WorldToScreen((int)obj.x, (int)obj.y, hsx, hsy);
-            if (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_L) leftHandScreenX  = hsx;
-            else                                              rightHandScreenX = hsx;
+    // Boss laser — each hand renders its own beam independently.
+    // Visible when handAnimState==1 && handAttackFrame >= 10 && laserCenterY is set.
+    // The beam extends from the hand's screen X to the opposite wall (off-screen edge).
+    // DrawLaser is called with an off-screen "other" endpoint so the body tiles the
+    // full visible width while only this hand's head sprite is drawn on-screen.
+    for (auto& [id, obj] : mRenderList) {
+        if (obj.visual_id != VISUAL_BOSS_BELIAL_HAND_L &&
+            obj.visual_id != VISUAL_BOSS_BELIAL_HAND_R) continue;
+        if (obj.handAnimState != 1 || obj.handAttackFrame < 10) continue;
+        if (obj.laserCenterY < 0) continue;
+
+        int laserFrame = min(obj.handAttackFrame - 10, 6);
+        int laserSX, laserSY;
+        camera->WorldToScreen(0, obj.laserCenterY * TILE_SIZE + TILE_SIZE / 2,
+                              laserSX, laserSY);
+        int hsx, hsy;
+        camera->WorldToScreen((int)obj.x, (int)obj.y, hsx, hsy);
+
+        if (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_L) {
+            // Left hand: normal head at hsx, body extends right (right "head" far off-screen)
+            SpriteManager::DrawLaser(hdc, laserSY, hsx, hsx + 4000, TILE_SIZE, laserFrame);
+        } else {
+            // Right hand: body from far left (off-screen), flipped head at hsx
+            SpriteManager::DrawLaser(hdc, laserSY, hsx - 4000, hsx, TILE_SIZE, laserFrame);
         }
-        if (laserFrame >= 0) {
-            int laserSX, laserSY;
-            camera->WorldToScreen(0, mLaserCenterY * TILE_SIZE + TILE_SIZE / 2,
-                                  laserSX, laserSY);
-            SpriteManager::DrawLaser(hdc, laserSY,
-                                     leftHandScreenX, rightHandScreenX,
-                                     TILE_SIZE, laserFrame);
+    }
+
+    // Phase 2: falling swords at dungeon columns x = 3, 6, 9, ...
+    if (mSwordFallActive) {
+        DWORD elapsed = GetTickCount() - mSwordFallStartMs;
+        if (elapsed >= (DWORD)mSwordFallDurationMs) {
+            mSwordFallActive = false;
+        } else {
+            float progress = (float)elapsed / (float)mSwordFallDurationMs;
+            // Sword center tile Y: 0.0 → DUNGEON_SIZE-1
+            float swordTileY = progress * (DUNGEON_SIZE - 1);
+            int swordWorldCenterY = (int)(swordTileY * TILE_SIZE + TILE_SIZE / 2);
+
+            const int SWORD_DRAW_W = TILE_SIZE;
+            const int SWORD_DRAW_H = TILE_SIZE * 3;
+
+            for (int tileX = SWORD_X_STEP; tileX < DUNGEON_SIZE; tileX += SWORD_X_STEP) {
+                int swordWorldCenterX = tileX * TILE_SIZE + TILE_SIZE / 2;
+                int screenX, screenY;
+                camera->WorldToScreen(swordWorldCenterX, swordWorldCenterY, screenX, screenY);
+                SpriteManager::DrawSword(hdc, screenX, screenY, SWORD_DRAW_W, SWORD_DRAW_H);
+            }
         }
     }
 }
@@ -694,14 +717,8 @@ void Player::RenderObjects(HDC hdc)
                 int bossFrame = (int)(GetTickCount() / 120) % BOSS_BELIAL_IDLE_FRAMES;
                 SpriteManager::DrawBoss(hdc, bossFrame, screenX, screenY, BOSS_DRAW, BOSS_DRAW);
 
-                // Small floating HP bar just above the sprite (world-space visual)
-                int bossTop = screenY - BOSS_DRAW / 2;
-                DrawHpBar(hdc, screenX, bossTop - 10, obj.hp, obj.max_hp > 0 ? obj.max_hp : 1);
-
-                SetTextColor(hdc, RGB(255, 80, 80));
-                const std::string& nm = obj.obj_name;
-                TextOutA(hdc, screenX - (int)(nm.size() * 4), bossTop - 24,
-                         nm.c_str(), (int)nm.size());
+                // Boss name and HP are shown in the dedicated boss HP bar (RenderLayer2).
+                // No floating name / HP bar is drawn above the sprite.
 
             } else if (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_L ||
                        obj.visual_id == VISUAL_BOSS_BELIAL_HAND_R) {
@@ -1826,7 +1843,6 @@ void Player::DungeonEnter(unsigned char entered, int instance_id, short tileX, s
     mRenderList.clear();
     mSelfDamages.clear();
     mAttackEffects.clear();
-    mLaserCenterY = -1;
 }
 
 void Player::OnHandMoveTo(int objId, short targetX, short targetY, int moveMs)
@@ -1848,10 +1864,20 @@ void Player::OnHandMoveTo(int objId, short targetX, short targetY, int moveMs)
     obj.isMoving       = false;  // disable the generic lerp for hands
 }
 
-void Player::OnLaserFire(short centerY, int /*durationMs*/)
+void Player::OnLaserFire(int objectId, short centerY, int /*durationMs*/)
 {
-    // Store the row — laser visibility is driven by hand attack animation frame
-    mLaserCenterY = centerY;
+    // Store the target row on the firing hand's RenderObject.
+    // Laser visibility is gated by hand attack animation frame >= 10.
+    auto it = mRenderList.find(objectId);
+    if (it != mRenderList.end())
+        it->second.laserCenterY = centerY;
+}
+
+void Player::OnSwordFall(int fallDurationMs)
+{
+    mSwordFallActive     = true;
+    mSwordFallStartMs    = GetTickCount();
+    mSwordFallDurationMs = fallDurationMs;
 }
 
 void Player::OnHandAnimState(int objId, unsigned char animState)
@@ -1863,6 +1889,7 @@ void Player::OnHandAnimState(int objId, unsigned char animState)
     obj.handAnimState   = animState;
     obj.handAttackFrame = 0;
     obj.handAttackTimer = 0.0f;
+    if (animState == 0) obj.laserCenterY = -1;  // laser off when hand goes idle
 }
 
 // ---------------------------------------------------------------------------

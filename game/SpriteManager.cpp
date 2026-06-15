@@ -11,6 +11,7 @@ Gdiplus::Bitmap*           SpriteManager::sBossHand                  = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossHandAttack            = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossLaserHead             = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossLaserBody             = nullptr;
+Gdiplus::Bitmap*           SpriteManager::sBossSword                 = nullptr;
 bool         SpriteManager::sLoaded       = false;
 ULONG_PTR    SpriteManager::sGdiplusToken = 0;
 
@@ -116,6 +117,11 @@ void SpriteManager::Init()
         };
         sBossLaserHead = loadLaser(bossDir + L"Laser\\head.png");
         sBossLaserBody = loadLaser(bossDir + L"Laser\\body.png");
+
+        // Sword (static sprite, no animation)
+        Gdiplus::Bitmap* sw = Gdiplus::Bitmap::FromFile((bossDir + L"Sword\\default.png").c_str());
+        if (sw && sw->GetLastStatus() == Gdiplus::Ok) sBossSword = sw;
+        else { delete sw; sBossSword = nullptr; }
     }
 
     sLoaded = true;
@@ -146,6 +152,7 @@ void SpriteManager::Shutdown()
     delete sBossHandAttack; sBossHandAttack = nullptr;
     delete sBossLaserHead;  sBossLaserHead  = nullptr;
     delete sBossLaserBody;  sBossLaserBody  = nullptr;
+    delete sBossSword;      sBossSword      = nullptr;
     if (sGdiplusToken) {
         Gdiplus::GdiplusShutdown(sGdiplusToken);
         sGdiplusToken = 0;
@@ -735,4 +742,29 @@ void SpriteManager::DrawLaser(HDC hdc, int screenCenterY, int leftHandX, int rig
 
     drawHead(leftHandX,  false);  // left hand head — normal
     drawHead(rightHandX, true);   // right hand head — flipped
+}
+
+// Draw a falling sword (static sprite) centered at (screenCenterX, screenCenterY).
+// drawW = 1 tile wide, drawH = 3 tiles tall.
+void SpriteManager::DrawSword(HDC hdc, int screenCenterX, int screenCenterY,
+                               int drawW, int drawH)
+{
+    int destX = screenCenterX - drawW / 2;
+    int destY = screenCenterY - drawH / 2;
+
+    if (sBossSword) {
+        Gdiplus::Graphics g(hdc);
+        g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+        g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+        Gdiplus::Rect dest(destX, destY, drawW, drawH);
+        g.DrawImage(sBossSword, dest,
+                    0, 0, (INT)sBossSword->GetWidth(), (INT)sBossSword->GetHeight(),
+                    Gdiplus::UnitPixel);
+    } else {
+        // Fallback: thin blue-white rectangle (sword silhouette)
+        HBRUSH br = CreateSolidBrush(RGB(180, 200, 255));
+        RECT r = { destX + drawW / 3, destY, destX + drawW * 2 / 3, destY + drawH };
+        FillRect(hdc, &r, br);
+        DeleteObject(br);
+    }
 }

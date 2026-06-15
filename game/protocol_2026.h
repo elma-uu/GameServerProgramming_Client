@@ -9,6 +9,7 @@ constexpr int DUNGEON_BASE_X        = 2500;
 constexpr int DUNGEON_BASE_Y        = 100;
 constexpr int DUNGEON_SIZE          = 30;
 constexpr int DUNGEON_STRIDE        = 50;
+constexpr int SWORD_X_STEP          = 3;    // sword column spacing (tiles 3,6,9,...)
 constexpr int MAX_DUNGEON_INSTANCES = 250;
 constexpr int MAX_PLAYERS = 10000;
 constexpr int NUM_NPCS = 200000;
@@ -88,6 +89,7 @@ enum PACKET_TYPE {
 	S2C_HAND_MOVE_TO,	//	boss hand smooth movement
 	S2C_LASER_FIRE,		//	laser fires at dungeon row y
 	S2C_HAND_ANIM_STATE,//	switch boss hand anim state (0=idle 1=attack)
+	S2C_SWORD_FALL,		//	phase 2 swords fall from top to bottom
 };
 
 enum STAT_TYPE : unsigned char {
@@ -396,6 +398,7 @@ struct S2C_HandMoveTo {
 struct S2C_LaserFire {
 	unsigned char size;
 	PACKET_TYPE   type;
+	int           object_id;   // which hand fired
 	short         center_y;
 	int           duration_ms;
 };
@@ -405,6 +408,13 @@ struct S2C_HandAnimState {
 	PACKET_TYPE   type;
 	int           object_id;
 	unsigned char anim_state;  // 0=idle  1=attack
+};
+
+// Phase 2: swords fall at x=3,6,9,... from row 0 to DUNGEON_SIZE-1
+struct S2C_SwordFall {
+	unsigned char size;
+	PACKET_TYPE   type;
+	int           fall_duration_ms;
 };
 
 #pragma pack(pop) // Restore default packing

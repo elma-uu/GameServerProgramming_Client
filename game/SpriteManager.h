@@ -82,6 +82,10 @@ public:
     static void DrawLaser(HDC hdc, int screenCenterY, int leftHandX, int rightHandX,
                           int tileH, int laserFrame);
 
+    // Draw a falling sword centered at (screenCenterX, screenCenterY).
+    // drawW = 1 tile wide, drawH = 3 tiles tall.
+    static void DrawSword(HDC hdc, int screenCenterX, int screenCenterY, int drawW, int drawH);
+
     static bool IsLoaded() { return sLoaded; }
 
 private:
@@ -122,6 +126,7 @@ private:
     static Gdiplus::Bitmap* sBossHandAttack;  // Hand/attack.png
     static Gdiplus::Bitmap* sBossLaserHead;   // Laser/head.png  (7 frames)
     static Gdiplus::Bitmap* sBossLaserBody;   // Laser/body.png  (7 frames)
+    static Gdiplus::Bitmap* sBossSword;       // Sword/default.png (static)
     static std::wstring FindBossDir();
     static Gdiplus::Bitmap* LoadBossSheet(const std::wstring& dir);
     static Gdiplus::Bitmap* LoadHandSheet(const std::wstring& dir);

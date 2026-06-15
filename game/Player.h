@@ -108,8 +108,9 @@ public:
 
     // Boss pattern events
     void OnHandMoveTo(int objId, short targetX, short targetY, int moveMs);
-    void OnLaserFire(short centerY, int durationMs);
+    void OnLaserFire(int objectId, short centerY, int durationMs);
     void OnHandAnimState(int objId, unsigned char animState);
+    void OnSwordFall(int fallDurationMs);
 
     void SendPartyCreate();
     void SendPartyJoin(int partyId);
@@ -166,6 +167,9 @@ private:
         int                handAnimState   = 0;   // 0=idle  1=attack
         int                handAttackFrame = 0;
         float              handAttackTimer = 0.0f;
+
+        // Boss hand: laser target row (-1 = no active laser)
+        int                laserCenterY    = -1;
     };
 
     struct SelfDamage
@@ -261,8 +265,10 @@ private:
     bool  mIsInDungeon       = false;
     int   mDungeonInstanceId = -1;
 
-    // Boss laser visual — driven by hand attack animation frame, not a timer
-    int   mLaserCenterY = -1;    // tile Y set by S2C_LASER_FIRE; -1 = not yet received
+    // Phase 2 sword fall visual
+    bool  mSwordFallActive     = false;
+    DWORD mSwordFallStartMs    = 0;
+    int   mSwordFallDurationMs = 0;
 
     // Party state
     int                       mPartyId          = -1;

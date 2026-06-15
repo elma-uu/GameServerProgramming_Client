@@ -261,13 +261,19 @@ void Network::ProcessPacket(char* recv_packet)
 	case S2C_LASER_FIRE:
 	{
 		S2C_LaserFire* pkt = reinterpret_cast<S2C_LaserFire*>(recv_packet);
-		GAME.GetAvatar()->OnLaserFire(pkt->center_y, pkt->duration_ms);
+		GAME.GetAvatar()->OnLaserFire(pkt->object_id, pkt->center_y, pkt->duration_ms);
 	}
 	break;
 	case S2C_HAND_ANIM_STATE:
 	{
 		S2C_HandAnimState* pkt = reinterpret_cast<S2C_HandAnimState*>(recv_packet);
 		GAME.GetAvatar()->OnHandAnimState(pkt->object_id, pkt->anim_state);
+	}
+	break;
+	case S2C_SWORD_FALL:
+	{
+		S2C_SwordFall* pkt = reinterpret_cast<S2C_SwordFall*>(recv_packet);
+		GAME.GetAvatar()->OnSwordFall(pkt->fall_duration_ms);
 	}
 	break;
 	default:
