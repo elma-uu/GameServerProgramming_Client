@@ -359,26 +359,6 @@ void Player::RenderLayer1(HDC hdc)
 
     SetBkMode(hdc, TRANSPARENT);
 
-    // Username above head
-    if (!mMyUsername.empty()) {
-        SetTextColor(hdc, RGB(255, 255, 255));
-        TextOutA(hdc,
-            screenX - (int)(mMyUsername.size() * 4),
-            screenY - PLAYER_SIZE / 2 - 15,
-            mMyUsername.c_str(), (int)mMyUsername.size());
-    }
-
-    // Level label + small HP bar below feet
-    {
-        const int footY = screenY + PLAYER_SIZE / 2 + 2;
-        SetTextColor(hdc, RGB(255, 255, 80));
-        char lvBuf[16];
-        sprintf_s(lvBuf, "Lv.%d", (int)mLevel);
-        TextOutA(hdc, screenX - (int)(strlen(lvBuf) * 4), footY,
-            lvBuf, static_cast<int>(strlen(lvBuf)));
-        DrawHpBar(hdc, screenX, footY + 14, GetHp(), mMaxHp > 0 ? mMaxHp : 1);
-    }
-
     RenderAttackEffects(hdc);
 
     // Damage numbers from monster attacks (float near our avatar)
@@ -434,6 +414,30 @@ void Player::RenderLayer2(HDC hdc)
         char hpBuf[32];
         sprintf_s(hpBuf, "HP  %d / %d", hp, maxHp);
         TextOutA(hdc, BAR_X + 4, BAR_Y + 1, hpBuf, (int)strlen(hpBuf));
+
+        // Name + level
+        const int INFO_Y = BAR_Y + BAR_H + 4;
+        const int INFO_LH = 16;
+        if (!mMyUsername.empty()) {
+            char nameBuf[72];
+            sprintf_s(nameBuf, "%s   Lv.%d", mMyUsername.c_str(), (int)mLevel);
+            SetTextColor(hdc, RGB(255, 255, 200));
+            TextOutA(hdc, BAR_X, INFO_Y, nameBuf, (int)strlen(nameBuf));
+        }
+
+        // EXP / next level EXP
+        {
+            char expBuf[64];
+            if (mLevel >= 100) {
+                sprintf_s(expBuf, "EXP: MAX");
+            } else {
+                unsigned long long nextExp =
+                    (unsigned long long)mLevel * mLevel * 20ULL;
+                sprintf_s(expBuf, "EXP: %llu / %llu", mExp, nextExp);
+            }
+            SetTextColor(hdc, RGB(120, 220, 120));
+            TextOutA(hdc, BAR_X, INFO_Y + INFO_LH, expBuf, (int)strlen(expBuf));
+        }
     }
 
     // Boss HP bar — shown at the top center while inside the dungeon
@@ -458,7 +462,7 @@ void Player::RenderLayer2(HDC hdc)
             const int BAR_H  = 22;
             const int BAR_W  = winW / 2;              // half the screen width
             const int BAR_X  = (winW - BAR_W) / 2;   // centered
-            const int BAR_Y  = 8;
+            const int BAR_Y  = 35;  // 10px below player HP bar (player bar at y=10)
 
             int fillW = BAR_W * max(0, bossHp) / bossMaxHp;
 
@@ -806,12 +810,10 @@ std::string Player::GetObjectName(int objectId) const
 void Player::RenderStats(HDC hdc)
 {
     const int PX = 600;
-    const int PY = 10;
     const int PW = 195;
     const int LH = 18;
-
-    // rows: 4 stats + points + gold + divider + 2 inventory rows + hint row
     const int TOTAL_ROWS = 9;
+    const int PY = 600 - 10 - TOTAL_ROWS * LH - 6;  // bottom-right (= 422)
 
     HBRUSH bgBrush = CreateSolidBrush(RGB(20, 20, 20));
     HPEN nullPen   = (HPEN)GetStockObject(NULL_PEN);
@@ -1541,7 +1543,7 @@ void Player::RenderQuestPanel(HDC hdc) const
     int panelH = 10;
     for (int i = 0; i < 2; ++i)
         if (mQuests[i].state >= 1 && mQuests[i].state <= 2) panelH += 42;
-    const int PANEL_Y = 440 - panelH - 6;    // 6px gap above minimap
+    const int PANEL_Y = 10 + 150 + 6;        // 6px gap below minimap (minimap top-right y=10, h=150)
 
     // Background
     HBRUSH bgBr = CreateSolidBrush(RGB(10, 10, 30));

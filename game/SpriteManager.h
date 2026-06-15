@@ -35,7 +35,7 @@ constexpr MonFrameInfo MON_FRAMES[4] = {
 constexpr int MON_IDLE_FRAMES = 5;
 
 constexpr int BOSS_BELIAL_IDLE_FRAMES = 10;
-constexpr int BOSS_BELIAL_HAND_FRAMES = 9;
+constexpr int BOSS_BELIAL_HAND_FRAMES = 10;
 
 class SpriteManager
 {

@@ -15,7 +15,7 @@ private:
     static const int MINIMAP_WIDTH  = 150;
     static const int MINIMAP_HEIGHT = 150;
     static const int MINIMAP_X = 800 - MINIMAP_WIDTH  - 10;  // 640  (right side)
-    static const int MINIMAP_Y = 600 - MINIMAP_HEIGHT - 10;  // 440  (bottom)
+    static const int MINIMAP_Y = 10;                          // top-right
 
     // �� ����
     int mMapTilesX;
