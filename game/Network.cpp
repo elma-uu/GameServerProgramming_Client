@@ -276,6 +276,24 @@ void Network::ProcessPacket(char* recv_packet)
 		GAME.GetAvatar()->OnSwordFall(pkt->fall_duration_ms);
 	}
 	break;
+	case S2C_SWORD_FALL_H:
+	{
+		S2C_SwordFallH* pkt = reinterpret_cast<S2C_SwordFallH*>(recv_packet);
+		GAME.GetAvatar()->OnSwordFallH(pkt->fall_duration_ms);
+	}
+	break;
+	case S2C_PLAYER_DIE:
+	{
+		S2C_PlayerDie* pkt = reinterpret_cast<S2C_PlayerDie*>(recv_packet);
+		GAME.GetAvatar()->OnPlayerDie(pkt->object_id);
+	}
+	break;
+	case S2C_ENHANCE_RESULT:
+	{
+		S2C_EnhanceResult* pkt = reinterpret_cast<S2C_EnhanceResult*>(recv_packet);
+		GAME.GetAvatar()->OnEnhanceResult(pkt->result, pkt->new_level, pkt->gold);
+	}
+	break;
 	default:
 		// Unknown Packet Type
 		break;
@@ -287,6 +305,14 @@ void SendQuestInteractToServer()
 	C2S_QuestInteract pkt;
 	pkt.size = sizeof(C2S_QuestInteract);
 	pkt.type = C2S_QUEST_INTERACT;
+	GAME.GetNetwork()->Send(reinterpret_cast<void*>(&pkt));
+}
+
+void SendEnhanceWeaponToServer()
+{
+	C2S_EnhanceWeapon pkt;
+	pkt.size = sizeof(C2S_EnhanceWeapon);
+	pkt.type = C2S_ENHANCE_WEAPON;
 	GAME.GetNetwork()->Send(reinterpret_cast<void*>(&pkt));
 }
 

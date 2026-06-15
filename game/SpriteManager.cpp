@@ -12,6 +12,7 @@ Gdiplus::Bitmap*           SpriteManager::sBossHandAttack            = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossLaserHead             = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossLaserBody             = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossSword                 = nullptr;
+Gdiplus::Bitmap*           SpriteManager::sBossSwordH                = nullptr;
 bool         SpriteManager::sLoaded       = false;
 ULONG_PTR    SpriteManager::sGdiplusToken = 0;
 
@@ -57,6 +58,7 @@ void SpriteManager::Init()
         for (int i = 0; i < CHAR_COUNT; ++i) {
             sSprites[i].idle = LoadBmp(dir, kCharFolders[i], "idle");
             sSprites[i].run  = LoadBmp(dir, kCharFolders[i], "run");
+            sSprites[i].die  = LoadBmp(dir, kCharFolders[i], "die");
         }
     }
 
@@ -118,10 +120,14 @@ void SpriteManager::Init()
         sBossLaserHead = loadLaser(bossDir + L"Laser\\head.png");
         sBossLaserBody = loadLaser(bossDir + L"Laser\\body.png");
 
-        // Sword (static sprite, no animation)
+        // Sword sprites (static, no animation)
         Gdiplus::Bitmap* sw = Gdiplus::Bitmap::FromFile((bossDir + L"Sword\\default.png").c_str());
         if (sw && sw->GetLastStatus() == Gdiplus::Ok) sBossSword = sw;
         else { delete sw; sBossSword = nullptr; }
+
+        Gdiplus::Bitmap* swh = Gdiplus::Bitmap::FromFile((bossDir + L"Sword\\default_x.png").c_str());
+        if (swh && swh->GetLastStatus() == Gdiplus::Ok) sBossSwordH = swh;
+        else { delete swh; sBossSwordH = nullptr; }
     }
 
     sLoaded = true;
@@ -132,6 +138,7 @@ void SpriteManager::Shutdown()
     for (int i = 0; i < CHAR_COUNT; ++i) {
         delete sSprites[i].idle; sSprites[i].idle = nullptr;
         delete sSprites[i].run;  sSprites[i].run  = nullptr;
+        delete sSprites[i].die;  sSprites[i].die  = nullptr;
     }
     for (int i = 0; i < MON_COUNT; ++i) {
         delete sMonsters[i].idle;   sMonsters[i].idle   = nullptr;
@@ -153,6 +160,7 @@ void SpriteManager::Shutdown()
     delete sBossLaserHead;  sBossLaserHead  = nullptr;
     delete sBossLaserBody;  sBossLaserBody  = nullptr;
     delete sBossSword;      sBossSword      = nullptr;
+    delete sBossSwordH;     sBossSwordH     = nullptr;
     if (sGdiplusToken) {
         Gdiplus::GdiplusShutdown(sGdiplusToken);
         sGdiplusToken = 0;
@@ -767,4 +775,48 @@ void SpriteManager::DrawSword(HDC hdc, int screenCenterX, int screenCenterY,
         FillRect(hdc, &r, br);
         DeleteObject(br);
     }
+}
+
+// Draw a horizontal sweeping sword (default_x.png) centered at (screenCenterX, screenCenterY).
+// drawW = 3 tiles wide, drawH = 1 tile tall.
+void SpriteManager::DrawSwordH(HDC hdc, int screenCenterX, int screenCenterY,
+                                int drawW, int drawH)
+{
+    int destX = screenCenterX - drawW / 2;
+    int destY = screenCenterY - drawH / 2;
+    if (sBossSwordH) {
+        Gdiplus::Graphics g(hdc);
+        g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+        g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+        Gdiplus::Rect dest(destX, destY, drawW, drawH);
+        g.DrawImage(sBossSwordH, dest,
+                    0, 0, (INT)sBossSwordH->GetWidth(), (INT)sBossSwordH->GetHeight(),
+                    Gdiplus::UnitPixel);
+    } else {
+        // Fallback: thin blue-white horizontal bar
+        HBRUSH br = CreateSolidBrush(RGB(180, 200, 255));
+        RECT r = { destX, destY + drawH / 3, destX + drawW, destY + drawH * 2 / 3 };
+        FillRect(hdc, &r, br);
+        DeleteObject(br);
+    }
+}
+
+// Draw player death animation frame centered at (screenX, screenY).
+void SpriteManager::DrawDie(HDC hdc, int charId, int frame,
+                             int screenX, int screenY, int drawW, int drawH, bool flipH)
+{
+    if (charId < 0 || charId >= CHAR_COUNT) charId = CHAR_BASE;
+    Gdiplus::Bitmap* sheet = sSprites[charId].die;
+    int destX = screenX - drawW / 2;
+    int destY = screenY - drawH / 2;
+    if (!sheet) {
+        // Fallback: red translucent overlay
+        HBRUSH br = CreateSolidBrush(RGB(180, 0, 0));
+        RECT rc = { destX, destY, destX + drawW, destY + drawH };
+        FillRect(hdc, &rc, br);
+        DeleteObject(br);
+        return;
+    }
+    Gdiplus::Graphics g(hdc);
+    DrawFrame(g, sheet, frame, SPRITE_DIE_FRAMES, destX, destY, drawW, drawH, flipH);
 }

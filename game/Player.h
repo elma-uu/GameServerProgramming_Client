@@ -111,6 +111,14 @@ public:
     void OnLaserFire(int objectId, short centerY, int durationMs);
     void OnHandAnimState(int objId, unsigned char animState);
     void OnSwordFall(int fallDurationMs);
+    void OnSwordFallH(int fallDurationMs);
+
+    // Death / respawn
+    void OnPlayerDie(int objectId);
+
+    // Weapon enhancement
+    void OnEnhanceResult(unsigned char result, unsigned char newLevel, int gold);
+    void SendEnhancePacket();
 
     void SendPartyCreate();
     void SendPartyJoin(int partyId);
@@ -170,6 +178,11 @@ private:
 
         // Boss hand: laser target row (-1 = no active laser)
         int                laserCenterY    = -1;
+
+        // Death animation
+        bool               isDying         = false;
+        int                dieFrame        = 0;
+        float              dieTimer        = 0.0f;
     };
 
     struct SelfDamage
@@ -269,6 +282,21 @@ private:
     bool  mSwordFallActive     = false;
     DWORD mSwordFallStartMs    = 0;
     int   mSwordFallDurationMs = 0;
+
+    // Phase 2 horizontal sword sweep visual
+    bool  mSwordHFallActive     = false;
+    DWORD mSwordHFallStartMs    = 0;
+    int   mSwordHFallDurationMs = 0;
+
+    // Death animation (self)
+    bool  mIsDying  = false;
+    int   mDieFrame = 0;
+    float mDieTimer = 0.0f;
+
+    // Weapon enhancement
+    int          mWeaponEnhance     = 0;
+    std::wstring mEnhanceMsg;
+    float        mEnhanceMsgTimer   = 0.0f;
 
     // Party state
     int                       mPartyId          = -1;

@@ -52,6 +52,17 @@ void Player::Update()
     // block movement and stat keys while in chat mode
     if (Input::IsChatMode()) return;
 
+    // Block all input while dead; advance die animation
+    if (mIsDying) {
+        constexpr float DIE_FRAME_DUR = 0.2f;
+        mDieTimer += Time::DeltaTime();
+        if (mDieTimer >= DIE_FRAME_DUR) {
+            mDieTimer -= DIE_FRAME_DUR;
+            if (mDieFrame < SPRITE_DIE_FRAMES - 1) mDieFrame++;
+        }
+        return;
+    }
+
     // P key: toggle party interface
     if (Input::GetKeyDown(eKeyCode::P)) {
         mShowPartyUI = !mShowPartyUI;
@@ -76,19 +87,18 @@ void Player::Update()
         }
     }
 
-    // Shop UI modal: ESC closes, LButton buys item
+    // Shop UI modal: ESC closes, LButton buys item or enhances weapon
     if (mShowShopUI) {
         if (Input::GetKeyDown(eKeyCode::ESC)) {
             mShowShopUI = false;
             return;
         }
         if (Input::GetKeyDown(eKeyCode::LButton)) {
-            // Panel: PX=100, PY=90, PW=600, PH=350
-            // Potion slot: col 0, x=200, Scroll slot: col 1, x=450
-            // Buy button rect: y=280, w=120, h=36, centered on colCX
+            Vector2 mp = Input::GetMousePosition();
+
+            // Item buy buttons: centered at colCX, y=300
             const int colCX[2]  = { 250, 550 };
             const int btnY = 300, btnW = 120, btnH = 36;
-            Vector2 mp = Input::GetMousePosition();
             for (int i = 0; i < 2; ++i) {
                 int bx = colCX[i] - btnW / 2;
                 if (mp.x >= bx && mp.x <= bx + btnW &&
@@ -98,6 +108,23 @@ void Player::Update()
                     break;
                 }
             }
+
+            // Enhance button: centered at x=400, y=500, w=150, h=36
+            {
+                const int enhBtnX = 400 - 75, enhBtnY = 500;
+                const int enhBtnW = 150,       enhBtnH = 36;
+                if (mWeaponEnhance < 25 &&
+                    mp.x >= enhBtnX && mp.x <= enhBtnX + enhBtnW &&
+                    mp.y >= enhBtnY && mp.y <= enhBtnY + enhBtnH) {
+                    SendEnhancePacket();
+                }
+            }
+        }
+
+        // Tick enhance message timer
+        if (mEnhanceMsgTimer > 0.0f) {
+            mEnhanceMsgTimer -= Time::DeltaTime();
+            if (mEnhanceMsgTimer < 0.0f) mEnhanceMsgTimer = 0.0f;
         }
         return;
     }
@@ -282,13 +309,21 @@ void Player::Update()
             [](const SelfDamage& d) { return d.timeLeft <= 0.0f; }),
         mSelfDamages.end());
 
-    // Tick attack animation timers on render objects
+    // Tick attack animation timers + die animation on render objects
     for (auto& [id, obj] : mRenderList) {
         if (obj.isAttacking) {
             obj.attackTimer -= dt;
             if (obj.attackTimer <= 0.0f) {
                 obj.isAttacking = false;
                 obj.attackTimer = 0.0f;
+            }
+        }
+        if (obj.isDying) {
+            constexpr float DIE_FRAME_DUR = 0.2f;
+            obj.dieTimer += dt;
+            if (obj.dieTimer >= DIE_FRAME_DUR) {
+                obj.dieTimer -= DIE_FRAME_DUR;
+                if (obj.dieFrame < SPRITE_DIE_FRAMES - 1) obj.dieFrame++;
             }
         }
     }
@@ -382,8 +417,13 @@ void Player::RenderLayer1(HDC hdc)
     int screenX, screenY;
     camera->WorldToScreen(GetX(), GetY(), screenX, screenY);
 
-    SpriteManager::DrawSprite(hdc, mVisualId, mIsMoving, mAnimFrame,
-        screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, mFacingLeft);
+    if (mIsDying) {
+        SpriteManager::DrawDie(hdc, mVisualId, mDieFrame,
+            screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, mFacingLeft);
+    } else {
+        SpriteManager::DrawSprite(hdc, mVisualId, mIsMoving, mAnimFrame,
+            screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, mFacingLeft);
+    }
 
     SetBkMode(hdc, TRANSPARENT);
 
@@ -431,14 +471,13 @@ void Player::RenderLayer1(HDC hdc)
         }
     }
 
-    // Phase 2: falling swords at dungeon columns x = 3, 6, 9, ...
+    // Phase 2: vertical swords falling at x = 3, 6, 9, ...
     if (mSwordFallActive) {
         DWORD elapsed = GetTickCount() - mSwordFallStartMs;
         if (elapsed >= (DWORD)mSwordFallDurationMs) {
             mSwordFallActive = false;
         } else {
             float progress = (float)elapsed / (float)mSwordFallDurationMs;
-            // Sword center tile Y: 0.0 → DUNGEON_SIZE-1
             float swordTileY = progress * (DUNGEON_SIZE - 1);
             int swordWorldCenterY = (int)(swordTileY * TILE_SIZE + TILE_SIZE / 2);
 
@@ -450,6 +489,28 @@ void Player::RenderLayer1(HDC hdc)
                 int screenX, screenY;
                 camera->WorldToScreen(swordWorldCenterX, swordWorldCenterY, screenX, screenY);
                 SpriteManager::DrawSword(hdc, screenX, screenY, SWORD_DRAW_W, SWORD_DRAW_H);
+            }
+        }
+    }
+
+    // Phase 2: horizontal swords sweeping rightward at y = 3, 6, 9, ...
+    if (mSwordHFallActive) {
+        DWORD elapsed = GetTickCount() - mSwordHFallStartMs;
+        if (elapsed >= (DWORD)mSwordHFallDurationMs) {
+            mSwordHFallActive = false;
+        } else {
+            float progress = (float)elapsed / (float)mSwordHFallDurationMs;
+            float swordTileX = progress * (DUNGEON_SIZE - 1);
+            int swordWorldCenterX = (int)(swordTileX * TILE_SIZE + TILE_SIZE / 2);
+
+            const int SWORD_DRAW_W = TILE_SIZE * 3;
+            const int SWORD_DRAW_H = TILE_SIZE;
+
+            for (int tileY = SWORD_X_STEP; tileY < DUNGEON_SIZE; tileY += SWORD_X_STEP) {
+                int swordWorldCenterY = tileY * TILE_SIZE + TILE_SIZE / 2;
+                int screenX, screenY;
+                camera->WorldToScreen(swordWorldCenterX, swordWorldCenterY, screenX, screenY);
+                SpriteManager::DrawSwordH(hdc, screenX, screenY, SWORD_DRAW_W, SWORD_DRAW_H);
             }
         }
     }
@@ -776,10 +837,17 @@ void Player::RenderObjects(HDC hdc)
 
         } else {
             // --- Other Player ---
-            int runFrames = obj.isMoving ? SPRITE_RUN_FRAMES : SPRITE_IDLE_FRAMES;
-            int objFrame  = (int)((GetTickCount() / 150) % runFrames);
-            SpriteManager::DrawSprite(hdc, obj.visual_id, obj.isMoving, objFrame,
-                screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
+            if (obj.isDying || obj.hp <= 0) {
+                // Dead / dying: render die pose (last frame when animation is done)
+                int dieF = obj.isDying ? obj.dieFrame : (SPRITE_DIE_FRAMES - 1);
+                SpriteManager::DrawDie(hdc, obj.visual_id, dieF,
+                    screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
+            } else {
+                int runFrames = obj.isMoving ? SPRITE_RUN_FRAMES : SPRITE_IDLE_FRAMES;
+                int objFrame  = (int)((GetTickCount() / 150) % runFrames);
+                SpriteManager::DrawSprite(hdc, obj.visual_id, obj.isMoving, objFrame,
+                    screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, obj.facingLeft);
+            }
 
             // Name above head
             SetTextColor(hdc, RGB(180, 220, 255));
@@ -1341,8 +1409,30 @@ bool Player::IsInSafeZone() const
 // Respawn (called when killed by a monster)
 // ---------------------------------------------------------------------------
 
+void Player::OnPlayerDie(int objectId)
+{
+    if (objectId == playerID) {
+        mIsDying  = true;
+        mDieFrame = 0;
+        mDieTimer = 0.0f;
+        mIsMoving = false;
+    } else {
+        auto it = mRenderList.find(objectId);
+        if (it != mRenderList.end()) {
+            it->second.isDying  = true;
+            it->second.dieFrame = 0;
+            it->second.dieTimer = 0.0f;
+        }
+    }
+}
+
 void Player::Respawn(int hp, int maxHp, short tileX, short tileY)
 {
+    // Clear death state so normal rendering and input resume
+    mIsDying  = false;
+    mDieFrame = 0;
+    mDieTimer = 0.0f;
+
     SetHp(hp);
     mMaxHp = maxHp;
     int pixelX = tileX * TILE_SIZE + TILE_SIZE / 2;
@@ -1361,6 +1451,33 @@ void Player::SendBuyItemPacket(ITEM_TYPE itemType)
 {
     extern void SendBuyItemToServer(ITEM_TYPE t);
     SendBuyItemToServer(itemType);
+}
+
+void Player::SendEnhancePacket()
+{
+    extern void SendEnhanceWeaponToServer();
+    SendEnhanceWeaponToServer();
+}
+
+void Player::OnEnhanceResult(unsigned char result, unsigned char newLevel, int gold)
+{
+    mGold          = gold;
+    mWeaponEnhance = (int)newLevel;
+
+    if (result == 1) {
+        wchar_t buf[32];
+        swprintf_s(buf, L"Success! Weapon +%d", (int)newLevel);
+        mEnhanceMsg      = buf;
+        mEnhanceMsgTimer = 3.0f;
+    } else if (result == 2) {
+        mEnhanceMsg      = L"Failed! Enhancement RESET to +0";
+        mEnhanceMsgTimer = 3.0f;
+    } else {
+        wchar_t buf[32];
+        swprintf_s(buf, L"Failed. Weapon stays at +%d", (int)newLevel);
+        mEnhanceMsg      = buf;
+        mEnhanceMsgTimer = 3.0f;
+    }
 }
 
 void Player::SendUseItemPacket(ITEM_TYPE itemType)
@@ -1420,7 +1537,7 @@ void Player::RenderShopUI(HDC hdc)
 {
     if (!mShowShopUI) return;
 
-    const int PX = 100, PY = 90, PW = 600, PH = 350;
+    const int PX = 100, PY = 90, PW = 600, PH = 510;
 
     HBRUSH bgBrush  = CreateSolidBrush(RGB(20, 30, 20));
     HPEN   bordPen  = CreatePen(PS_SOLID, 2, RGB(100, 180, 100));
@@ -1532,6 +1649,135 @@ void Player::RenderShopUI(HDC hdc)
         SelectObject(hdc, oldFont);   // restore
     }
 
+    // ── Weapon Enhancement Section ───────────────────────────────────────────
+    // Divider
+    {
+        HPEN div = CreatePen(PS_SOLID, 1, RGB(60, 100, 60));
+        HPEN odp = (HPEN)SelectObject(hdc, div);
+        MoveToEx(hdc, PX + 20, PY + 360, nullptr);
+        LineTo(hdc, PX + PW - 20, PY + 360);
+        SelectObject(hdc, odp); DeleteObject(div);
+    }
+
+    // Section title
+    {
+        HFONT secFont = CreateFontW(18, 0, 0, 0, FW_BOLD, 0, 0, 0,
+            HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+        oldFont = (HFONT)SelectObject(hdc, secFont);
+        SetTextColor(hdc, RGB(255, 220, 80));
+        const wchar_t* sec = L"[ Weapon Enhancement ]";
+        TextOutW(hdc, PX + PW / 2 - 95, PY + 372, sec, (int)wcslen(sec));
+        SelectObject(hdc, oldFont); DeleteObject(secFont);
+    }
+
+    // Level design tables (client mirrors server tables — display only)
+    static const int ENH_COST[25] = {
+        500,   500,   500,   500,   500,
+        1500,  1500,  1500,  1500,  1500,
+        5000,  5000,  5000,  5000,  5000,
+        15000, 15000, 15000, 15000, 15000,
+        50000, 50000, 50000, 50000, 50000,
+    };
+    static const int ENH_SUCCESS[25] = {
+        90, 85, 80, 75, 70,
+        65, 60, 55, 50, 45,
+        40, 35, 30, 28, 25,
+        22, 20, 18, 15, 13,
+        11,  9,  7,  5,  3,
+    };
+    static const int ENH_RESET[25] = {
+         0,  0,  0,  0,  0,
+         0,  0,  0,  0,  0,
+         0,  0,  5,  8, 12,
+        16, 20, 25, 30, 35,
+        40, 50, 60, 70, 80,
+    };
+
+    HFONT infoFont = CreateFontW(16, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT boldFont = CreateFontW(28, 0, 0, 0, FW_BOLD, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+
+    // Current level badge (left)
+    {
+        oldFont = (HFONT)SelectObject(hdc, boldFont);
+        wchar_t lvBuf[16];
+        if (mWeaponEnhance == 25)
+            swprintf_s(lvBuf, L"+25 MAX");
+        else
+            swprintf_s(lvBuf, L"+%d", mWeaponEnhance);
+        COLORREF lvColor = (mWeaponEnhance == 0)   ? RGB(180, 180, 180) :
+                           (mWeaponEnhance < 12)   ? RGB(100, 220, 255) :
+                           (mWeaponEnhance < 20)   ? RGB(255, 160, 50)  :
+                                                     RGB(255, 80,  80);
+        SetTextColor(hdc, lvColor);
+        TextOutW(hdc, PX + 40, PY + 405, lvBuf, (int)wcslen(lvBuf));
+        SelectObject(hdc, oldFont);
+    }
+
+    // Stats block (center)
+    if (mWeaponEnhance < 25)
+    {
+        int lv = mWeaponEnhance;
+        oldFont = (HFONT)SelectObject(hdc, infoFont);
+
+        wchar_t buf[64];
+        swprintf_s(buf, L"Cost:     %d G", ENH_COST[lv]);
+        SetTextColor(hdc, RGB(255, 210, 60));
+        TextOutW(hdc, PX + 170, PY + 400, buf, (int)wcslen(buf));
+
+        swprintf_s(buf, L"Success:  %d%%", ENH_SUCCESS[lv]);
+        SetTextColor(hdc, RGB(100, 220, 100));
+        TextOutW(hdc, PX + 170, PY + 422, buf, (int)wcslen(buf));
+
+        if (ENH_RESET[lv] > 0) {
+            swprintf_s(buf, L"Reset on fail: %d%%", ENH_RESET[lv]);
+            SetTextColor(hdc, RGB(255, 90, 90));
+            TextOutW(hdc, PX + 170, PY + 444, buf, (int)wcslen(buf));
+        }
+
+        swprintf_s(buf, L"Damage bonus: +%d", mWeaponEnhance * 10);
+        SetTextColor(hdc, RGB(180, 180, 255));
+        TextOutW(hdc, PX + 170, PY + 466, buf, (int)wcslen(buf));
+
+        SelectObject(hdc, oldFont);
+    }
+
+    // Enhance button
+    {
+        const int enhBtnX = 400 - 75, enhBtnY = 500;
+        const int enhBtnW = 150,       enhBtnH = 36;
+        bool canEnhance = (mWeaponEnhance < 25) &&
+                          (mGold >= (mWeaponEnhance < 25 ? ENH_COST[mWeaponEnhance] : 0));
+        HBRUSH btnBr = CreateSolidBrush(
+            (mWeaponEnhance >= 25) ? RGB(60, 60, 60) :
+            canEnhance             ? RGB(160, 80, 20) :
+                                     RGB(80, 80, 80));
+        HBRUSH oldBtn = (HBRUSH)SelectObject(hdc, btnBr);
+        Rectangle(hdc, enhBtnX, enhBtnY, enhBtnX + enhBtnW, enhBtnY + enhBtnH);
+        SelectObject(hdc, oldBtn); DeleteObject(btnBr);
+
+        oldFont = (HFONT)SelectObject(hdc, smFont);
+        SetTextColor(hdc, RGB(255, 255, 255));
+        const wchar_t* btnLbl = (mWeaponEnhance >= 25) ? L"MAX" : L"Enhance +1";
+        int blw = (int)wcslen(btnLbl) * 9;
+        TextOutW(hdc, enhBtnX + enhBtnW / 2 - blw / 2, enhBtnY + 9,
+                 btnLbl, (int)wcslen(btnLbl));
+        SelectObject(hdc, oldFont);
+    }
+
+    // Result message (fades out over 3s)
+    if (mEnhanceMsgTimer > 0.0f && !mEnhanceMsg.empty()) {
+        oldFont = (HFONT)SelectObject(hdc, infoFont);
+        SetTextColor(hdc, RGB(255, 255, 120));
+        int mw = (int)mEnhanceMsg.size() * 9;
+        TextOutW(hdc, PX + PW / 2 - mw / 2, PY + 542,
+                 mEnhanceMsg.c_str(), (int)mEnhanceMsg.size());
+        SelectObject(hdc, oldFont);
+    }
+
+    DeleteObject(infoFont);
+    DeleteObject(boldFont);
     DeleteObject(nameFont);
     DeleteObject(descFont);
     DeleteObject(smFont);
@@ -1878,6 +2124,13 @@ void Player::OnSwordFall(int fallDurationMs)
     mSwordFallActive     = true;
     mSwordFallStartMs    = GetTickCount();
     mSwordFallDurationMs = fallDurationMs;
+}
+
+void Player::OnSwordFallH(int fallDurationMs)
+{
+    mSwordHFallActive     = true;
+    mSwordHFallStartMs    = GetTickCount();
+    mSwordHFallDurationMs = fallDurationMs;
 }
 
 void Player::OnHandAnimState(int objId, unsigned char animState)

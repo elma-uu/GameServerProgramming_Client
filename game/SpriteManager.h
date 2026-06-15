@@ -7,6 +7,7 @@ enum { CHAR_BASE = 0, CHAR_ALICE, CHAR_METAL_PLATE, CHAR_PICKAX, CHAR_RED_LOTUS,
 
 constexpr int SPRITE_IDLE_FRAMES = 5;
 constexpr int SPRITE_RUN_FRAMES  = 8;
+constexpr int SPRITE_DIE_FRAMES  = 4;  // player_die.png frame count
 
 // Monster visual IDs (sent in S2C_ADD_OBJECT.visual_id for NPC objects)
 // 0=Dog  1=Small  2=Big_Normal  3=Magician_Ice
@@ -82,9 +83,17 @@ public:
     static void DrawLaser(HDC hdc, int screenCenterY, int leftHandX, int rightHandX,
                           int tileH, int laserFrame);
 
-    // Draw a falling sword centered at (screenCenterX, screenCenterY).
+    // Draw a vertical falling sword centered at (screenCenterX, screenCenterY).
     // drawW = 1 tile wide, drawH = 3 tiles tall.
     static void DrawSword(HDC hdc, int screenCenterX, int screenCenterY, int drawW, int drawH);
+
+    // Draw a horizontal sweeping sword centered at (screenCenterX, screenCenterY).
+    // drawW = 3 tiles wide, drawH = 1 tile tall.
+    static void DrawSwordH(HDC hdc, int screenCenterX, int screenCenterY, int drawW, int drawH);
+
+    // Draw player death animation frame centered at (screenX, screenY).
+    static void DrawDie(HDC hdc, int charId, int frame,
+                        int screenX, int screenY, int drawW, int drawH, bool flipH = false);
 
     static bool IsLoaded() { return sLoaded; }
 
@@ -93,6 +102,7 @@ private:
     struct CharSprites {
         Gdiplus::Bitmap* idle = nullptr;
         Gdiplus::Bitmap* run  = nullptr;
+        Gdiplus::Bitmap* die  = nullptr;
     };
     static CharSprites  sSprites[CHAR_COUNT];
 
@@ -126,7 +136,8 @@ private:
     static Gdiplus::Bitmap* sBossHandAttack;  // Hand/attack.png
     static Gdiplus::Bitmap* sBossLaserHead;   // Laser/head.png  (7 frames)
     static Gdiplus::Bitmap* sBossLaserBody;   // Laser/body.png  (7 frames)
-    static Gdiplus::Bitmap* sBossSword;       // Sword/default.png (static)
+    static Gdiplus::Bitmap* sBossSword;        // Sword/default.png   (vertical, 21×65)
+    static Gdiplus::Bitmap* sBossSwordH;      // Sword/default_x.png (horizontal, 65×21)
     static std::wstring FindBossDir();
     static Gdiplus::Bitmap* LoadBossSheet(const std::wstring& dir);
     static Gdiplus::Bitmap* LoadHandSheet(const std::wstring& dir);
