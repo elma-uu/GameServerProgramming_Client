@@ -6,6 +6,8 @@ SpriteManager::MonSprites  SpriteManager::sMonsters[MON_COUNT]   = {};
 Gdiplus::Bitmap*           SpriteManager::sNpcSheets[NPC_TOWN_COUNT] = {};
 Gdiplus::Bitmap*           SpriteManager::sUiImages[5]               = {};
 Gdiplus::Bitmap*           SpriteManager::sItemImages[2]             = {};
+Gdiplus::Bitmap*           SpriteManager::sTileSafe                  = nullptr;
+Gdiplus::Bitmap*           SpriteManager::sTileWall                  = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossIdle                  = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossHand                  = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossHandAttack            = nullptr;
@@ -98,6 +100,18 @@ void SpriteManager::Init()
         sItemImages[1] = LoadItemBmp(itemDir, L"teleport");
     }
 
+    // --- tile bitmaps ---
+    std::wstring tileDir = FindTileDir();
+    if (!tileDir.empty()) {
+        auto loadTile = [](const std::wstring& path) -> Gdiplus::Bitmap* {
+            Gdiplus::Bitmap* b = Gdiplus::Bitmap::FromFile(path.c_str());
+            if (!b || b->GetLastStatus() != Gdiplus::Ok) { delete b; return nullptr; }
+            return b;
+        };
+        sTileSafe = loadTile(tileDir + L"backGroundTile.png");
+        sTileWall = loadTile(tileDir + L"wallTile.png");
+    }
+
     // --- boss sprites ---
     std::wstring bossDir = FindBossDir();
     if (!bossDir.empty()) {
@@ -154,6 +168,8 @@ void SpriteManager::Shutdown()
     for (int i = 0; i < 2; ++i) {
         delete sItemImages[i]; sItemImages[i] = nullptr;
     }
+    delete sTileSafe;       sTileSafe       = nullptr;
+    delete sTileWall;       sTileWall       = nullptr;
     delete sBossIdle;       sBossIdle       = nullptr;
     delete sBossHand;       sBossHand       = nullptr;
     delete sBossHandAttack; sBossHandAttack = nullptr;
@@ -340,6 +356,55 @@ Gdiplus::Bitmap* SpriteManager::LoadMonBmp(const std::wstring& monDir,
 // ---------------------------------------------------------------------------
 // Monster drawing
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Tile path discovery and drawing
+// ---------------------------------------------------------------------------
+
+std::wstring SpriteManager::FindTileDir()
+{
+    WCHAR exeDir[MAX_PATH];
+    GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
+    WCHAR* last = wcsrchr(exeDir, L'\\');
+    if (last) *(last + 1) = L'\0';
+
+    const wchar_t* candidates[] = {
+        L"..\\..\\game\\Resource\\Tile\\",
+        L"..\\..\\..\\game\\Resource\\Tile\\",
+        L"game\\Resource\\Tile\\",
+        L"Resource\\Tile\\",
+        L"..\\Resource\\Tile\\",
+    };
+
+    for (const wchar_t* rel : candidates) {
+        WCHAR full[MAX_PATH];
+        swprintf_s(full, MAX_PATH, L"%s%s", exeDir, rel);
+        WCHAR probe[MAX_PATH];
+        swprintf_s(probe, MAX_PATH, L"%sbackGroundTile.png", full);
+        if (GetFileAttributesW(probe) != INVALID_FILE_ATTRIBUTES)
+            return std::wstring(full);
+    }
+    return L"";
+}
+
+void SpriteManager::DrawTile(HDC hdc, bool isSafe, int destX, int destY, int tileSize)
+{
+    Gdiplus::Bitmap* tile = isSafe ? sTileSafe : sTileWall;
+    if (tile) {
+        Gdiplus::Graphics g(hdc);
+        g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+        g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+        g.DrawImage(tile, Gdiplus::Rect(destX, destY, tileSize, tileSize));
+    } else {
+        // fallback solid colour
+        COLORREF col = isSafe ? RGB(60, 100, 60) : RGB(80, 60, 40);
+        HBRUSH br  = CreateSolidBrush(col);
+        HBRUSH old = (HBRUSH)SelectObject(hdc, br);
+        Rectangle(hdc, destX, destY, destX + tileSize, destY + tileSize);
+        SelectObject(hdc, old);
+        DeleteObject(br);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Town NPC path discovery and loading

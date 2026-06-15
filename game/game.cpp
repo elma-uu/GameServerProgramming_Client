@@ -35,6 +35,7 @@ void Game::Initialize(HWND hwnd, UINT width, UINT height)
 
 	mCamera.Initialize(2000, 2000, 50, 16, 12);
 	mMap.Initialize(2000, 2000, 50);
+	mMap.LoadMapFile();
 	mMiniMap.Initialize(2000, 2000, 50);
 	mAvatar.SetPosition(50025, 50025);
 	SpriteManager::Init();

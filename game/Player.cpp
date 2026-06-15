@@ -4,6 +4,7 @@
 #include "Camera.h"
 #include "Time.h"
 #include "SpriteManager.h"
+#include "Map.h"
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
@@ -243,10 +244,16 @@ void Player::Update()
         int px = (int)mMoveAccum;
         mMoveAccum -= (float)px;
         if (px > 0) {
-            if (Input::GetKey(eKeyCode::A)) { SetPosition(GetX() - px, GetY()); mLastDirection = LEFT; }
-            if (Input::GetKey(eKeyCode::D)) { SetPosition(GetX() + px, GetY()); mLastDirection = RIGHT; }
-            if (Input::GetKey(eKeyCode::W)) { SetPosition(GetX(), GetY() - px); mLastDirection = UP; }
-            if (Input::GetKey(eKeyCode::S)) { SetPosition(GetX(), GetY() + px); mLastDirection = DOWN; }
+            auto tryMove = [&](int nx, int ny) {
+                if (mIsInDungeon) { SetPosition(nx, ny); return; }
+                int tx = nx / TILE_SIZE;
+                int ty = ny / TILE_SIZE;
+                if (Map::IsWalkable(tx, ty)) SetPosition(nx, ny);
+            };
+            if (Input::GetKey(eKeyCode::A)) { tryMove(GetX() - px, GetY()); mLastDirection = LEFT; }
+            if (Input::GetKey(eKeyCode::D)) { tryMove(GetX() + px, GetY()); mLastDirection = RIGHT; }
+            if (Input::GetKey(eKeyCode::W)) { tryMove(GetX(), GetY() - px); mLastDirection = UP; }
+            if (Input::GetKey(eKeyCode::S)) { tryMove(GetX(), GetY() + px); mLastDirection = DOWN; }
         }
     } else {
         mMoveAccum = 0.0f;

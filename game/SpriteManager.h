@@ -95,6 +95,10 @@ public:
     static void DrawDie(HDC hdc, int charId, int frame,
                         int screenX, int screenY, int drawW, int drawH, bool flipH = false);
 
+    // Draw a world tile at top-left (destX, destY) with size tileSize.
+    // isSafe=true → backGroundTile.png (town), false → wallTile.png (wilderness).
+    static void DrawTile(HDC hdc, bool isSafe, int destX, int destY, int tileSize);
+
     static bool IsLoaded() { return sLoaded; }
 
 private:
@@ -129,6 +133,11 @@ private:
 
     // ---- shop item images: [0]=potion  [1]=teleport ----
     static Gdiplus::Bitmap* sItemImages[2];
+
+    // ---- tile bitmaps (Resource/Tile/) ----
+    static Gdiplus::Bitmap* sTileSafe;   // backGroundTile.png (safe zone / town)
+    static Gdiplus::Bitmap* sTileWall;   // wallTile.png (wilderness)
+    static std::wstring FindTileDir();
 
     // ---- boss sprites (Resource/Boss/Belial/) ----
     static Gdiplus::Bitmap* sBossIdle;
