@@ -37,7 +37,7 @@ public:
 	void OnLoginSuccess();           // new user: auth ok → show char-select screen
 	void OnLoginDirect();            // existing user: auth ok → PLAYING immediately
 	void OnCharSelected(int charId); // char chosen → send packet → PLAYING
-	void SetLoginMessage(const std::string& msg) { mLoginMessage = msg; }
+	void SetLoginMessage(const std::wstring& msg) { mLoginMessage = msg; }
 
 private:
 	void clearRenderTarget();
@@ -68,7 +68,7 @@ private:
 	Network* mNetwork;
 
 	GameState   mState;
-	std::string mLoginMessage;
+	std::wstring mLoginMessage;
 	int         mCharSelectIdx;   // 0-4, current selection on char-select screen
 };
 

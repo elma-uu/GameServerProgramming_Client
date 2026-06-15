@@ -969,22 +969,26 @@ void Player::RenderStats(HDC hdc)
 
     SetBkMode(hdc, TRANSPARENT);
 
-    // ?�?� Stats ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
-    SetTextColor(hdc, RGB(200, 220, 255));
-    char buf[64];
-    sprintf_s(buf, "STR:%3d   INT:%3d", (int)mStr, (int)mIntl);
-    TextOutA(hdc, PX + 4, PY, buf, (int)strlen(buf));
+    HFONT statFont = CreateFontW(14, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT oldStatFont = (HFONT)SelectObject(hdc, statFont);
 
-    sprintf_s(buf, "DEX:%3d   LUK:%3d", (int)mDex, (int)mLuk);
-    TextOutA(hdc, PX + 4, PY + LH, buf, (int)strlen(buf));
+    // Stats
+    SetTextColor(hdc, RGB(200, 220, 255));
+    wchar_t wbuf[64];
+    swprintf_s(wbuf, L"STR:%3d   INT:%3d", (int)mStr, (int)mIntl);
+    TextOutW(hdc, PX + 4, PY, wbuf, (int)wcslen(wbuf));
+
+    swprintf_s(wbuf, L"DEX:%3d   LUK:%3d", (int)mDex, (int)mLuk);
+    TextOutW(hdc, PX + 4, PY + LH, wbuf, (int)wcslen(wbuf));
 
     SetTextColor(hdc, mStatPoints > 0 ? RGB(255, 255, 80) : RGB(150, 150, 150));
-    sprintf_s(buf, "Points: %d", (int)mStatPoints);
-    TextOutA(hdc, PX + 4, PY + LH * 2, buf, (int)strlen(buf));
+    swprintf_s(wbuf, L"포인트: %d", (int)mStatPoints);
+    TextOutW(hdc, PX + 4, PY + LH * 2, wbuf, (int)wcslen(wbuf));
 
     SetTextColor(hdc, RGB(255, 210, 60));
-    sprintf_s(buf, "Gold: %d", mGold);
-    TextOutA(hdc, PX + 4, PY + LH * 3, buf, (int)strlen(buf));
+    swprintf_s(wbuf, L"골드: %d", mGold);
+    TextOutW(hdc, PX + 4, PY + LH * 3, wbuf, (int)wcslen(wbuf));
 
     // ?�?� Divider ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     HPEN divPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 80));
@@ -1000,14 +1004,14 @@ void Player::RenderStats(HDC hdc)
     // Potion row
     bool canUsePotion = (mPotionCount > 0 && mPotionCooldown <= 0.0f);
     SetTextColor(hdc, canUsePotion ? RGB(100, 220, 100) : RGB(120, 120, 120));
-    sprintf_s(buf, "[1] HP Potion  x%d", mPotionCount);
-    TextOutA(hdc, PX + 4, invY, buf, (int)strlen(buf));
+    swprintf_s(wbuf, L"[1] HP 포션  x%d", mPotionCount);
+    TextOutW(hdc, PX + 4, invY, wbuf, (int)wcslen(wbuf));
 
     if (mPotionCooldown > 0.0f) {
         SetTextColor(hdc, RGB(200, 100, 100));
-        char cdBuf[16];
-        sprintf_s(cdBuf, " %.1fs", mPotionCooldown);
-        TextOutA(hdc, PX + 4, invY + LH - 2, cdBuf, (int)strlen(cdBuf));
+        wchar_t cdBuf[16];
+        swprintf_s(cdBuf, L" %.1fs", mPotionCooldown);
+        TextOutW(hdc, PX + 4, invY + LH - 2, cdBuf, (int)wcslen(cdBuf));
         invY += LH - 2;
     }
     invY += LH;
@@ -1015,13 +1019,16 @@ void Player::RenderStats(HDC hdc)
     // Scroll row
     bool canUseScroll = (mScrollCount > 0);
     SetTextColor(hdc, canUseScroll ? RGB(120, 180, 255) : RGB(120, 120, 120));
-    sprintf_s(buf, "[2] Teleport   x%d", mScrollCount);
-    TextOutA(hdc, PX + 4, invY, buf, (int)strlen(buf));
+    swprintf_s(wbuf, L"[2] 귀환 스크롤 x%d", mScrollCount);
+    TextOutW(hdc, PX + 4, invY, wbuf, (int)wcslen(wbuf));
     invY += LH;
 
     // Hint
     SetTextColor(hdc, RGB(100, 100, 140));
-    TextOutA(hdc, PX + 4, invY + 2, "Buy at Shop NPC", 15);
+    TextOutW(hdc, PX + 4, invY + 2, L"상점 NPC에서 구매 가능", 11);
+
+    SelectObject(hdc, oldStatFont);
+    DeleteObject(statFont);
 }
 
 void Player::SendStatInvestPacket(STAT_TYPE statType)
@@ -1120,8 +1127,8 @@ void Player::RenderPartyPanel(HDC hdc)
     if (mPartyId < 0) {
         SetBkMode(hdc, TRANSPARENT);
         SetTextColor(hdc, RGB(120, 120, 120));
-        const char* hint = "[P] Party";
-        TextOutA(hdc, PX, PY, hint, (int)strlen(hint));
+        const wchar_t* hint = L"[P] 파티";
+        TextOutW(hdc, PX, PY, hint, (int)wcslen(hint));
         return;
     }
 
@@ -1137,9 +1144,9 @@ void Player::RenderPartyPanel(HDC hdc)
 
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, RGB(100, 160, 255));
-    char title[32];
-    sprintf_s(title, "Party #%d", mPartyId);
-    TextOutA(hdc, PX + 4, PY + 2, title, (int)strlen(title));
+    wchar_t title[32];
+    swprintf_s(title, L"파티 #%d", mPartyId);
+    TextOutW(hdc, PX + 4, PY + 2, title, (int)wcslen(title));
 
     for (int i = 0; i < (int)mPartyMembers.size(); ++i) {
         const PartyMember& m = mPartyMembers[i];
@@ -1189,29 +1196,33 @@ void Player::RenderPartyUI(HDC hdc)
 
     SetBkMode(hdc, TRANSPARENT);
 
+    HFONT partyFont = CreateFontW(15, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT partyBold = CreateFontW(16, 0, 0, 0, FW_BOLD, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT oldFont = (HFONT)SelectObject(hdc, partyBold);
+
     // Title
     SetTextColor(hdc, RGB(120, 180, 255));
-    const char* title = "=== Party System ===   [P/ESC: close]";
-    TextOutA(hdc, MX + 10, MY + 10, title, (int)strlen(title));
+    TextOutW(hdc, MX + 10, MY + 10, L"=== 파티 시스템 ===   [P/ESC: 닫기]", 19);
 
+    SelectObject(hdc, partyFont);
     int y = MY + 38;
 
     // Create / Leave button
     if (mPartyId < 0) {
         bool sel = (mPartyUISelection == -1);
         SetTextColor(hdc, sel ? RGB(80, 255, 80) : RGB(60, 180, 60));
-        const char* btn = sel ? "> [Create Party]" : "  [Create Party]";
-        TextOutA(hdc, MX + 10, y, btn, (int)strlen(btn));
+        TextOutW(hdc, MX + 10, y, sel ? L"> [파티 생성]" : L"  [파티 생성]", 9);
     } else {
-        char curInfo[48];
-        sprintf_s(curInfo, "  In Party #%d", mPartyId);
+        wchar_t curInfo[48];
+        swprintf_s(curInfo, L"  파티 #%d 참가 중", mPartyId);
         SetTextColor(hdc, RGB(100, 200, 100));
-        TextOutA(hdc, MX + 10, y, curInfo, (int)strlen(curInfo));
+        TextOutW(hdc, MX + 10, y, curInfo, (int)wcslen(curInfo));
         y += 18;
         bool sel = (mPartyUISelection == -2);
         SetTextColor(hdc, sel ? RGB(255, 80, 80) : RGB(180, 60, 60));
-        const char* btn = sel ? "> [Leave Party]" : "  [Leave Party]";
-        TextOutA(hdc, MX + 10, y, btn, (int)strlen(btn));
+        TextOutW(hdc, MX + 10, y, sel ? L"> [파티 탈퇴]" : L"  [파티 탈퇴]", 9);
     }
     y += 28;
 
@@ -1225,30 +1236,33 @@ void Player::RenderPartyUI(HDC hdc)
     y += 8;
 
     SetTextColor(hdc, RGB(160, 160, 200));
-    TextOutA(hdc, MX + 10, y, "Available Parties:", 18);
+    TextOutW(hdc, MX + 10, y, L"참가 가능한 파티:", 9);
     y += 18;
 
     if (mPartyList.empty()) {
         SetTextColor(hdc, RGB(100, 100, 100));
-        TextOutA(hdc, MX + 20, y, "(none)  Create one!", 19);
+        TextOutW(hdc, MX + 20, y, L"(없음)  파티를 만들어보세요!", 14);
     } else {
         for (int i = 0; i < (int)mPartyList.size(); ++i) {
             const PartyUIEntry& e = mPartyList[i];
             bool sel = (mPartyUISelection == i);
             SetTextColor(hdc, sel ? RGB(255, 255, 80) : RGB(180, 180, 180));
-            char row[80];
-            sprintf_s(row, "%s Party #%-3d  Leader: %-12s  [%d/4]",
-                sel ? ">" : " ",
+            wchar_t row[96];
+            swprintf_s(row, L"%s 파티 #%-3d  리더: %-12S  [%d/4]",
+                sel ? L"▶" : L"  ",
                 e.party_id, e.leader_name, (int)e.member_count);
-            TextOutA(hdc, MX + 10, y, row, (int)strlen(row));
+            TextOutW(hdc, MX + 10, y, row, (int)wcslen(row));
             y += 20;
         }
     }
 
     // Controls hint at bottom
     SetTextColor(hdc, RGB(90, 90, 90));
-    const char* hint = "Up/Down: navigate    Space: confirm";
-    TextOutA(hdc, MX + 10, MY + MH - 22, hint, (int)strlen(hint));
+    TextOutW(hdc, MX + 10, MY + MH - 22, L"위/아래: 이동    Space: 확인", 14);
+
+    SelectObject(hdc, oldFont);
+    DeleteObject(partyFont);
+    DeleteObject(partyBold);
 }
 
 // ---------------------------------------------------------------------------
@@ -1466,15 +1480,15 @@ void Player::OnEnhanceResult(unsigned char result, unsigned char newLevel, int g
 
     if (result == 1) {
         wchar_t buf[32];
-        swprintf_s(buf, L"Success! Weapon +%d", (int)newLevel);
+        swprintf_s(buf, L"강화 성공! 무기 +%d", (int)newLevel);
         mEnhanceMsg      = buf;
         mEnhanceMsgTimer = 3.0f;
     } else if (result == 2) {
-        mEnhanceMsg      = L"Failed! Enhancement RESET to +0";
+        mEnhanceMsg      = L"강화 실패! 강화 수치가 +0으로 초기화되었습니다.";
         mEnhanceMsgTimer = 3.0f;
     } else {
         wchar_t buf[32];
-        swprintf_s(buf, L"Failed. Weapon stays at +%d", (int)newLevel);
+        swprintf_s(buf, L"강화 실패. 현재 +%d 유지", (int)newLevel);
         mEnhanceMsg      = buf;
         mEnhanceMsgTimer = 3.0f;
     }
@@ -1554,8 +1568,8 @@ void Player::RenderShopUI(HDC hdc)
         HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
     HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
     SetTextColor(hdc, RGB(120, 220, 120));
-        const wchar_t* title = L"[ Stat Investment ]";
-    TextOutW(hdc, PX + PW / 2 - 50, PY + 12, title, (int)wcslen(title));
+        const wchar_t* title = L"[ 상점 ]";
+    TextOutW(hdc, PX + PW / 2 - 35, PY + 12, title, (int)wcslen(title));
 
     // Gold & close hint
     HFONT smFont = CreateFontW(15, 0, 0, 0, FW_NORMAL, 0, 0, 0,
@@ -1566,8 +1580,8 @@ void Player::RenderShopUI(HDC hdc)
     SetTextColor(hdc, RGB(255, 210, 60));
     TextOutW(hdc, PX + 12, PY + 14, goldBuf, (int)wcslen(goldBuf));
     SetTextColor(hdc, RGB(130, 130, 130));
-        const wchar_t* hint = L"F / ESC: Close";
-    TextOutW(hdc, PX + PW - 110, PY + 14, hint, (int)wcslen(hint));
+        const wchar_t* hint = L"F / ESC: 닫기";
+    TextOutW(hdc, PX + PW - 100, PY + 14, hint, (int)wcslen(hint));
     DeleteObject(SelectObject(hdc, oldFont));
 
     // Item columns
@@ -1579,10 +1593,10 @@ void Player::RenderShopUI(HDC hdc)
         const wchar_t* desc2;
     };
     const ShopItem items[2] = {
-        { ITEM_HP_POTION,       L"HP Potion",       SHOP_POTION_PRICE,
-          L"Use '1' key  *  adds to inventory",  L"Restores 33pct of max HP (min 50)"  },
-        { ITEM_TELEPORT_SCROLL, L"Teleport Scroll", SHOP_TELEPORT_PRICE,
-          L"Use '2' key  *  adds to inventory",  L"Exit dungeon, return to town"      },
+        { ITEM_HP_POTION,       L"HP 포션",       SHOP_POTION_PRICE,
+          L"'1' 키로 사용  *  인벤토리에 추가됨",  L"최대 HP의 33% 회복 (최소 50)"  },
+        { ITEM_TELEPORT_SCROLL, L"귀환 스크롤", SHOP_TELEPORT_PRICE,
+          L"'2' 키로 사용  *  인벤토리에 추가됨",  L"던전 탈출, 마을로 귀환"      },
     };
 
     const int colCX[2] = { 250, 550 };
@@ -1643,7 +1657,7 @@ void Player::RenderShopUI(HDC hdc)
 
         oldFont = (HFONT)SelectObject(hdc, smFont);
         SetTextColor(hdc, canBuy ? RGB(255, 255, 255) : RGB(140, 140, 140));
-        const wchar_t* btnBuf = L"Buy";
+        const wchar_t* btnBuf = L"구매";
         int blw = (int)wcslen(btnBuf) * 9;
         TextOutW(hdc, cx - blw / 2, btnY + 9, btnBuf, (int)wcslen(btnBuf));
         SelectObject(hdc, oldFont);   // restore
@@ -1665,7 +1679,7 @@ void Player::RenderShopUI(HDC hdc)
             HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
         oldFont = (HFONT)SelectObject(hdc, secFont);
         SetTextColor(hdc, RGB(255, 220, 80));
-        const wchar_t* sec = L"[ Weapon Enhancement ]";
+        const wchar_t* sec = L"[ 무기 강화 ]";
         TextOutW(hdc, PX + PW / 2 - 95, PY + 372, sec, (int)wcslen(sec));
         SelectObject(hdc, oldFont); DeleteObject(secFont);
     }
@@ -1722,21 +1736,21 @@ void Player::RenderShopUI(HDC hdc)
         oldFont = (HFONT)SelectObject(hdc, infoFont);
 
         wchar_t buf[64];
-        swprintf_s(buf, L"Cost:     %d G", ENH_COST[lv]);
+        swprintf_s(buf, L"강화 비용:  %d G", ENH_COST[lv]);
         SetTextColor(hdc, RGB(255, 210, 60));
         TextOutW(hdc, PX + 170, PY + 400, buf, (int)wcslen(buf));
 
-        swprintf_s(buf, L"Success:  %d%%", ENH_SUCCESS[lv]);
+        swprintf_s(buf, L"성공 확률:  %d%%", ENH_SUCCESS[lv]);
         SetTextColor(hdc, RGB(100, 220, 100));
         TextOutW(hdc, PX + 170, PY + 422, buf, (int)wcslen(buf));
 
         if (ENH_RESET[lv] > 0) {
-            swprintf_s(buf, L"Reset on fail: %d%%", ENH_RESET[lv]);
+            swprintf_s(buf, L"실패 시 초기화: %d%%", ENH_RESET[lv]);
             SetTextColor(hdc, RGB(255, 90, 90));
             TextOutW(hdc, PX + 170, PY + 444, buf, (int)wcslen(buf));
         }
 
-        swprintf_s(buf, L"Damage bonus: +%d", mWeaponEnhance * 10);
+        swprintf_s(buf, L"데미지 보너스: +%d", mWeaponEnhance * 10);
         SetTextColor(hdc, RGB(180, 180, 255));
         TextOutW(hdc, PX + 170, PY + 466, buf, (int)wcslen(buf));
 
@@ -1759,7 +1773,7 @@ void Player::RenderShopUI(HDC hdc)
 
         oldFont = (HFONT)SelectObject(hdc, smFont);
         SetTextColor(hdc, RGB(255, 255, 255));
-        const wchar_t* btnLbl = (mWeaponEnhance >= 25) ? L"MAX" : L"Enhance +1";
+        const wchar_t* btnLbl = (mWeaponEnhance >= 25) ? L"최대강화" : L"강화 +1";
         int blw = (int)wcslen(btnLbl) * 9;
         TextOutW(hdc, enhBtnX + enhBtnW / 2 - blw / 2, enhBtnY + 9,
                  btnLbl, (int)wcslen(btnLbl));
@@ -1849,8 +1863,8 @@ void Player::OnQuestUpdate(unsigned char questId, unsigned char state,
 void Player::RenderQuestPanel(HDC hdc) const
 {
     // Names displayed to the player (hardcoded Korean; logic/rewards live in quests.lua)
-        static const wchar_t* kQuestNames[2]  = { L"[Tutorial] Find the NPC", L"[Hunt] Monster Slayer" };
-        static const wchar_t* kQuestGoalDesc[2] = { L"Talk to Quest NPC", L"Kill 5 monsters" };
+        static const wchar_t* kQuestNames[2]  = { L"[튜토리얼] NPC 찾기", L"[사냥] 몬스터 슬레이어" };
+        static const wchar_t* kQuestGoalDesc[2] = { L"퀘스트 NPC에게 말 걸기", L"몬스터 5마리 처치" };
 
     // Check if any quest is active (state 1 or 2)
     bool anyActive = false;
@@ -1899,16 +1913,16 @@ void Player::RenderQuestPanel(HDC hdc) const
         SelectObject(hdc, descFont);
         if (i == 0) {
             // Tutorial: just "?�료! NPC?�게 ?�아가�? when complete
-            const wchar_t* txt = complete ? L"Done! Return to NPC [F]" : kQuestGoalDesc[i];
+            const wchar_t* txt = complete ? L"완료! NPC에게 돌아가기 [F]" : kQuestGoalDesc[i];
             SetTextColor(hdc, complete ? RGB(80, 220, 80) : RGB(160, 160, 200));
             TextOutW(hdc, PANEL_X + 8, rowY, txt, (int)wcslen(txt));
         } else {
             // Kill quest: show X/Y progress bar
             wchar_t progBuf[48];
             if (complete)
-                swprintf_s(progBuf, L"Done! Return to NPC [F]");
+                swprintf_s(progBuf, L"완료! NPC에게 돌아가기 [F]");
             else
-                                swprintf_s(progBuf, L"%d / %d killed", (int)mQuests[i].progress, (int)mQuests[i].goal);
+                swprintf_s(progBuf, L"%d / %d 처치", (int)mQuests[i].progress, (int)mQuests[i].goal);
             SetTextColor(hdc, complete ? RGB(80, 220, 80) : RGB(200, 180, 100));
             TextOutW(hdc, PANEL_X + 8, rowY, progBuf, (int)wcslen(progBuf));
 
@@ -1963,8 +1977,8 @@ void Player::RenderAbilityUI(HDC hdc)
         HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
     HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
     SetTextColor(hdc, RGB(255, 220, 80));
-        const wchar_t* title = L"[ Stat Investment ]";
-    TextOutW(hdc, PX + PW / 2 - 80, PY + 12, title, (int)wcslen(title));
+        const wchar_t* title = L"[ 능력치 투자 ]";
+    TextOutW(hdc, PX + PW / 2 - 65, PY + 12, title, (int)wcslen(title));
     DeleteObject(SelectObject(hdc, oldFont));
 
     // Stat points remaining
@@ -1972,14 +1986,14 @@ void Player::RenderAbilityUI(HDC hdc)
         HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
     oldFont = (HFONT)SelectObject(hdc, ptFont);
     wchar_t ptBuf[64];
-    swprintf_s(ptBuf, L"Stat Points: %d", (int)mStatPoints);
+    swprintf_s(ptBuf, L"능력치 포인트: %d", (int)mStatPoints);
     SetTextColor(hdc, mStatPoints > 0 ? RGB(100, 255, 100) : RGB(180, 80, 80));
     TextOutW(hdc, PX + PW / 2 - 85, PY + 40, ptBuf, (int)wcslen(ptBuf));
 
     // Close hint
     SetTextColor(hdc, RGB(150, 150, 150));
-        const wchar_t* hint = L"F / ESC: Close";
-    TextOutW(hdc, PX + PW - 100, PY + 12, hint, (int)wcslen(hint));
+        const wchar_t* hint = L"F / ESC: 닫기";
+    TextOutW(hdc, PX + PW - 95, PY + 12, hint, (int)wcslen(hint));
     DeleteObject(SelectObject(hdc, oldFont));
 
     // Per-stat data
@@ -1990,10 +2004,10 @@ void Player::RenderAbilityUI(HDC hdc)
         const wchar_t* effect2;
     };
     const StatInfo stats[4] = {
-                { L"STR", mStr,  L"Melee ATK+3",        L"Increases melee attack damage"   },
-        { L"INT", mIntl, L"Skill DMG+4",        L"Boosts AOE attack damage"        },
-        { L"DEX", mDex,  L"Move spd+5px/s",     L"Cap 400px/s (8 tiles/s)"        },
-                { L"LUK", mLuk,  L"Crit chance+1%",       L"Crit multiplier x1.5"       },
+        { L"STR", mStr,  L"근접 공격+3",     L"근접 공격 데미지 증가"     },
+        { L"INT", mIntl, L"스킬 데미지+4",  L"광역 공격 데미지 증가"     },
+        { L"DEX", mDex,  L"이동 속도+5px/s", L"최대 400px/s (8칸/s)"   },
+        { L"LUK", mLuk,  L"치명타 확률+1%", L"치명타 배율 x1.5"         },
     };
 
     // Column centers
@@ -2156,8 +2170,8 @@ void Player::RenderDungeonOverlay(HDC hdc)
         if (IsNearQuestNpc() && mPartyId >= 0) {
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, RGB(180, 255, 180));
-            const char* hint = "[G] Enter Dungeon";
-            TextOutA(hdc, 10, 440, hint, (int)strlen(hint));
+            const wchar_t* hint = L"[G] 던전 입장";
+            TextOutW(hdc, 10, 440, hint, (int)wcslen(hint));
         }
         return;
     }
@@ -2216,7 +2230,7 @@ void Player::RenderDungeonOverlay(HDC hdc)
     // HUD: dungeon info at top-left
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, RGB(255, 200, 80));
-    char dunBuf[48];
-    sprintf_s(dunBuf, "[Dungeon #%d]   G: Exit", mDungeonInstanceId);
-    TextOutA(hdc, 10, 440, dunBuf, (int)strlen(dunBuf));
+    wchar_t dunBuf[48];
+    swprintf_s(dunBuf, L"[던전 #%d]   G: 나가기", mDungeonInstanceId);
+    TextOutW(hdc, 10, 440, dunBuf, (int)wcslen(dunBuf));
 }

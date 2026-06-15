@@ -73,11 +73,11 @@ void Game::Update()
 				for (wchar_t c : id) idStr += static_cast<char>(c);
 				for (wchar_t c : pw) pwStr += static_cast<char>(c);
 				SendLoginPacket(idStr, pwStr);
-				mLoginMessage = "Connecting...";
+				mLoginMessage = L"접속 중...";
 			}
 			else
 			{
-				mLoginMessage = "ID and Password required.";
+				mLoginMessage = L"아이디와 비밀번호를 입력하세요.";
 			}
 		}
 		return; // skip game update while in login screen
@@ -278,18 +278,27 @@ void Game::RenderCharSelectScreen(HDC hdc)
 
 	SetBkMode(hdc, TRANSPARENT);
 
+	HFONT titleFont = CreateFontW(20, 0, 0, 0, FW_BOLD, 0, 0, 0,
+		HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+	HFONT hintFont  = CreateFontW(14, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+		HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+	HFONT nameFont  = CreateFontW(14, 0, 0, 0, FW_BOLD, 0, 0, 0,
+		HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+	HFONT oldFont   = (HFONT)SelectObject(hdc, titleFont);
+
 	// Title
 	SetTextColor(hdc, RGB(120, 180, 255));
-	const char* title = "== Select Your Character ==";
-	TextOutA(hdc, 270, 30, title, (int)strlen(title));
+	const wchar_t* title = L"== 캐릭터 선택 ==";
+	TextOutW(hdc, 290, 30, title, (int)wcslen(title));
 
 	// Sub-hint
+	SelectObject(hdc, hintFont);
 	SetTextColor(hdc, RGB(90, 90, 130));
-	const char* sub = "Left / Right  or  1-4  to navigate     Space to confirm";
-	TextOutA(hdc, 170, 555, sub, (int)strlen(sub));
+	const wchar_t* sub = L"← →  또는  1-4키로 이동     Space: 선택 확인";
+	TextOutW(hdc, 190, 555, sub, (int)wcslen(sub));
 
-	static const char* kCharNames[CHAR_COUNT] = {
-		"Base", "Alice", "Metal Plate", "Pickaxe", "Red Lotus"
+	static const wchar_t* kCharNames[CHAR_COUNT] = {
+		L"기본", L"앨리스", L"철갑전사", L"광부", L"홍련"
 	};
 
 	// 5 character slots evenly across 800 px
@@ -318,19 +327,26 @@ void Game::RenderCharSelectScreen(HDC hdc)
 		SpriteManager::DrawPreview(hdc, i, cx, cy, previewW);
 
 		// Character name
+		SelectObject(hdc, nameFont);
 		SetTextColor(hdc, selected ? RGB(255, 220, 60) : RGB(160, 160, 200));
-		const char* name = kCharNames[i];
-		int nameX = cx - (int)(strlen(name) * 4);
-		TextOutA(hdc, nameX, cy + previewH/2 + 14, name, (int)strlen(name));
+		const wchar_t* name = kCharNames[i];
+		int nameX = cx - (int)(wcslen(name) * 7);
+		TextOutW(hdc, nameX, cy + previewH/2 + 14, name, (int)wcslen(name));
 
 		// Number hint below name
+		SelectObject(hdc, hintFont);
 		SetTextColor(hdc, RGB(70, 70, 100));
-		char numHint[4];
+		wchar_t numHint[6];
 		if (i < 4) {
-			sprintf_s(numHint, "[%d]", i + 1);
-			TextOutA(hdc, cx - 10, cy + previewH/2 + 30, numHint, (int)strlen(numHint));
+			swprintf_s(numHint, L"[%d]", i + 1);
+			TextOutW(hdc, cx - 10, cy + previewH/2 + 30, numHint, (int)wcslen(numHint));
 		}
 	}
+
+	SelectObject(hdc, oldFont);
+	DeleteObject(titleFont);
+	DeleteObject(hintFont);
+	DeleteObject(nameFont);
 }
 
 void Game::SendCharSelectPacket(int charId)
@@ -345,13 +361,13 @@ void Game::SendCharSelectPacket(int charId)
 
 void Game::RenderLoginScreen(HDC hdc)
 {
-	const int CX = 400, CY = 300; // screen center
-	const int BOX_W = 300, BOX_H = 200;
+	const int CX = 400, CY = 300;
+	const int BOX_W = 320, BOX_H = 210;
 	const int BX = CX - BOX_W / 2, BY = CY - BOX_H / 2;
 
 	// Background panel
 	HBRUSH panelBrush = CreateSolidBrush(RGB(20, 20, 40));
-	HPEN borderPen = CreatePen(PS_SOLID, 2, RGB(80, 120, 200));
+	HPEN   borderPen  = CreatePen(PS_SOLID, 2, RGB(80, 120, 200));
 	HBRUSH oldBr = (HBRUSH)SelectObject(hdc, panelBrush);
 	HPEN   oldPn = (HPEN)SelectObject(hdc, borderPen);
 	Rectangle(hdc, BX, BY, BX + BOX_W, BY + BOX_H);
@@ -360,59 +376,70 @@ void Game::RenderLoginScreen(HDC hdc)
 
 	SetBkMode(hdc, TRANSPARENT);
 
+	HFONT titleFont = CreateFontW(18, 0, 0, 0, FW_BOLD, 0, 0, 0,
+		HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+	HFONT labelFont = CreateFontW(15, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+		HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+	HFONT inputFont = CreateFontW(14, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+		HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+	HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
+
 	// Title
 	SetTextColor(hdc, RGB(120, 180, 255));
-	const char* title = "SIMPLEST MMORPG";
-	TextOutA(hdc, CX - 60, BY + 12, title, static_cast<int>(strlen(title)));
+	const wchar_t* title = L"심플 MMORPG";
+	TextOutW(hdc, CX - 50, BY + 12, title, (int)wcslen(title));
 
-	// ID field
-	bool focusId = Input::IsLoginFocusId();
-	std::wstring idW  = Input::GetLoginId();
-	std::wstring pwW  = Input::GetLoginPw();
-	std::string  idS(idW.begin(), idW.end());
-	std::string  pwMask(pwW.size(), '*');
-
+	// ID / PW labels
+	SelectObject(hdc, labelFont);
 	SetTextColor(hdc, RGB(180, 180, 180));
-	TextOutA(hdc, BX + 20, BY + 50, "ID :", 4);
-	TextOutA(hdc, BX + 20, BY + 80, "PW :", 4);
+	TextOutW(hdc, BX + 16, BY + 52, L"아이디 :", 5);
+	TextOutW(hdc, BX + 16, BY + 82, L"비밀번호 :", 6);
 
-	// Input box highlight
+	// Input boxes
+	bool focusId = Input::IsLoginFocusId();
 	auto drawBox = [&](int x, int y, bool focused) {
-		HPEN pen = CreatePen(PS_SOLID, 1, focused ? RGB(100, 200, 100) : RGB(80, 80, 80));
-		HBRUSH br = CreateSolidBrush(RGB(30, 30, 50));
-		HBRUSH ob = (HBRUSH)SelectObject(hdc, br);
-		HPEN   op = (HPEN)SelectObject(hdc, pen);
-		Rectangle(hdc, x, y, x + 180, y + 20);
+		HPEN   pen = CreatePen(PS_SOLID, 1, focused ? RGB(100, 200, 100) : RGB(80, 80, 80));
+		HBRUSH br  = CreateSolidBrush(RGB(30, 30, 50));
+		HBRUSH ob  = (HBRUSH)SelectObject(hdc, br);
+		HPEN   op  = (HPEN)SelectObject(hdc, pen);
+		Rectangle(hdc, x, y, x + 170, y + 22);
 		SelectObject(hdc, ob); SelectObject(hdc, op);
 		DeleteObject(pen); DeleteObject(br);
 	};
+	drawBox(BX + 106, BY + 48, focusId);
+	drawBox(BX + 106, BY + 78, !focusId);
 
-	drawBox(BX + 55, BY + 47, focusId);
-	drawBox(BX + 55, BY + 77, !focusId);
+	// Input values (ASCII — login is always English)
+	std::wstring idW  = Input::GetLoginId();
+	std::wstring pwW  = Input::GetLoginPw();
+	std::wstring pwMask(pwW.size(), L'*');
 
+	SelectObject(hdc, inputFont);
 	SetTextColor(hdc, RGB(220, 220, 100));
-	char idBuf[24], pwBuf[24];
-	sprintf_s(idBuf, "%s_", idS.c_str());
-	sprintf_s(pwBuf, "%s_", pwMask.c_str());
-	TextOutA(hdc, BX + 58, BY + 49, focusId  ? idBuf : idS.c_str(),
-		static_cast<int>(focusId ? strlen(idBuf) : idS.size()));
-	TextOutA(hdc, BX + 58, BY + 79, !focusId ? pwBuf : pwMask.c_str(),
-		static_cast<int>(!focusId ? strlen(pwBuf) : pwMask.size()));
+	std::wstring idDisp  = focusId  ? (idW   + L"_") : idW;
+	std::wstring pwDisp  = !focusId ? (pwMask + L"_") : pwMask;
+	TextOutW(hdc, BX + 110, BY + 52, idDisp.c_str(),  (int)idDisp.size());
+	TextOutW(hdc, BX + 110, BY + 82, pwDisp.c_str(),  (int)pwDisp.size());
 
-	// Hints
+	// Hint
+	SelectObject(hdc, inputFont);
 	SetTextColor(hdc, RGB(120, 120, 120));
-	TextOutA(hdc, BX + 20, BY + 112, "Tab: switch   Enter: login/register", 35);
+	TextOutW(hdc, BX + 16, BY + 118, L"Tab: 전환   Enter: 로그인/회원가입", 20);
 
-	// Server message
+	// Server/validation message
 	if (!mLoginMessage.empty())
 	{
-		bool isError = (mLoginMessage.find("Wrong") != std::string::npos ||
-		                mLoginMessage.find("error") != std::string::npos ||
-		                mLoginMessage.find("required") != std::string::npos);
+		bool isError = (mLoginMessage.find(L"오류") != std::wstring::npos ||
+		                mLoginMessage.find(L"틀렸") != std::wstring::npos ||
+		                mLoginMessage.find(L"입력") != std::wstring::npos);
 		SetTextColor(hdc, isError ? RGB(255, 80, 80) : RGB(80, 255, 80));
-		TextOutA(hdc, BX + 10, BY + 145, mLoginMessage.c_str(),
-			static_cast<int>(mLoginMessage.size()));
+		TextOutW(hdc, BX + 10, BY + 152, mLoginMessage.c_str(), (int)mLoginMessage.size());
 	}
+
+	SelectObject(hdc, oldFont);
+	DeleteObject(titleFont);
+	DeleteObject(labelFont);
+	DeleteObject(inputFont);
 }
 
 void SendAttackToServer(DIRECTION dir)

@@ -80,7 +80,7 @@ void Input::ProcessChar(WPARAM wParam)
         if (!mInputText.empty())
             mInputText.pop_back();
     }
-    else if (wParam >= 32 && wParam <= 126 && mInputText.length() < MAX_CHAT_MSG_LEN - 1)
+    else if (wParam >= 32 && mInputText.length() < MAX_CHAT_MSG_LEN - 1)
     {
         mInputText += static_cast<wchar_t>(wParam);
     }

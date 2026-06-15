@@ -31,6 +31,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     // 전역 문자열을 초기화합니다.
     wcscpy_s(szTitle, L"Client");
     wcscpy_s(szWindowClass, L"GameWindow");
+
+    // 나눔바른고딕 폰트를 프로세스 초기에 등록 (ChatSystem 생성자보다 먼저 로드 보장)
+    AddFontResourceExA("./Resource/Font/NanumBarunGothic.ttf", FR_PRIVATE, nullptr);
+
     MyRegisterClass(hInstance);
 
     // 애플리케이션 초기화를 수행합니다:
@@ -119,9 +123,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         PostQuitMessage(0);
         break;
     case WM_CHAR:
+    case WM_IME_CHAR:
     {
         Input::ProcessChar(wParam);
-        break;
+        break;  // WM_IME_CHAR은 DefWindowProc으로 보내지 않음 (WM_CHAR 중복 방지)
     }
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);

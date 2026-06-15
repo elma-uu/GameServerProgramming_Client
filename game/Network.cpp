@@ -95,9 +95,13 @@ void Network::ProcessPacket(char* recv_packet)
 			// Returning user with saved character → enter game directly
 			GAME.OnLoginDirect();
 		}
+		else if (packet->result == LOGIN_WRONG_PW)
+		{
+			GAME.SetLoginMessage(L"비밀번호가 틀렸습니다.");
+		}
 		else
 		{
-			GAME.SetLoginMessage(std::string(packet->message));
+			GAME.SetLoginMessage(L"서버 오류가 발생했습니다.");
 		}
 	}
 	break;
