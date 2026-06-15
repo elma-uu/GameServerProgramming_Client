@@ -106,6 +106,11 @@ public:
     void DungeonEnter(unsigned char entered, int instance_id, short tileX, short tileY);
     bool IsInDungeon() const { return mIsInDungeon; }
 
+    // Boss pattern events
+    void OnHandMoveTo(int objId, short targetX, short targetY, int moveMs);
+    void OnLaserFire(short centerY, int durationMs);
+    void OnHandAnimState(int objId, unsigned char animState);
+
     void SendPartyCreate();
     void SendPartyJoin(int partyId);
     void SendPartyLeave();
@@ -149,6 +154,18 @@ private:
         int                max_hp      = 0;
         unsigned long long exp         = 0;
         unsigned char      level       = 1;
+
+        // Boss hand: smooth movement lerp
+        bool               handLerping     = false;
+        float              handLerpFromX   = 0.0f;
+        float              handLerpFromY   = 0.0f;
+        DWORD              handLerpStart   = 0;
+        int                handLerpDurMs   = 0;
+
+        // Boss hand: attack animation
+        int                handAnimState   = 0;   // 0=idle  1=attack
+        int                handAttackFrame = 0;
+        float              handAttackTimer = 0.0f;
     };
 
     struct SelfDamage
@@ -241,8 +258,11 @@ private:
     QuestEntry mQuests[2];  // [0]=tutorial  [1]=kill quest
 
     // Dungeon state
-    bool mIsInDungeon       = false;
-    int  mDungeonInstanceId = -1;
+    bool  mIsInDungeon       = false;
+    int   mDungeonInstanceId = -1;
+
+    // Boss laser visual — driven by hand attack animation frame, not a timer
+    int   mLaserCenterY = -1;    // tile Y set by S2C_LASER_FIRE; -1 = not yet received
 
     // Party state
     int                       mPartyId          = -1;

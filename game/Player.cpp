@@ -293,6 +293,34 @@ void Player::Update()
         }
     }
 
+    // Boss hand: smooth lerp movement + attack frame advance
+    DWORD nowMs = GetTickCount();
+    for (auto& [id, obj] : mRenderList) {
+        if (obj.visual_id != VISUAL_BOSS_BELIAL_HAND_L &&
+            obj.visual_id != VISUAL_BOSS_BELIAL_HAND_R) continue;
+
+        if (obj.handLerping) {
+            float t = (float)(nowMs - obj.handLerpStart) / (float)obj.handLerpDurMs;
+            if (t >= 1.0f) {
+                t = 1.0f;
+                obj.handLerping = false;
+            }
+            obj.x = obj.handLerpFromX + (obj.targetX - obj.handLerpFromX) * t;
+            obj.y = obj.handLerpFromY + (obj.targetY - obj.handLerpFromY) * t;
+        }
+
+        if (obj.handAnimState == 1) {
+            obj.handAttackTimer += dt;
+            if (obj.handAttackTimer >= 0.083f) {  // ~12 fps for 18 frames over 1.5 s
+                obj.handAttackTimer = 0.0f;
+                obj.handAttackFrame = (obj.handAttackFrame + 1) % BOSS_BELIAL_HAND_ATTACK_FRAMES;
+            }
+        } else {
+            obj.handAttackFrame = 0;
+            obj.handAttackTimer = 0.0f;
+        }
+    }
+
     // Tick attack effects
     for (auto& fx : mAttackEffects)
         fx.timeLeft -= dt;
@@ -375,6 +403,33 @@ void Player::RenderLayer1(HDC hdc)
     }
 
     RenderObjects(hdc);  // other players, monsters, HP bars, damage numbers
+
+    // Boss laser — visible when any hand's attack frame >= 10 and laser Y is known
+    if (mLaserCenterY >= 0) {
+        // Find a hand in attack state to read the current frame
+        int laserFrame = -1;
+        int leftHandScreenX = 0, rightHandScreenX = 0;
+        for (auto& [id, obj] : mRenderList) {
+            if (obj.visual_id != VISUAL_BOSS_BELIAL_HAND_L &&
+                obj.visual_id != VISUAL_BOSS_BELIAL_HAND_R) continue;
+            if (obj.handAnimState == 1 && obj.handAttackFrame >= 10) {
+                laserFrame = min(obj.handAttackFrame - 10, 6);
+            }
+            // Track screen X of each hand for head placement
+            int hsx, hsy;
+            camera->WorldToScreen((int)obj.x, (int)obj.y, hsx, hsy);
+            if (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_L) leftHandScreenX  = hsx;
+            else                                              rightHandScreenX = hsx;
+        }
+        if (laserFrame >= 0) {
+            int laserSX, laserSY;
+            camera->WorldToScreen(0, mLaserCenterY * TILE_SIZE + TILE_SIZE / 2,
+                                  laserSX, laserSY);
+            SpriteManager::DrawLaser(hdc, laserSY,
+                                     leftHandScreenX, rightHandScreenX,
+                                     TILE_SIZE, laserFrame);
+        }
+    }
 }
 
 // Layer 2 ? HUD/UI: fixed overlays drawn on top of everything
@@ -651,11 +706,14 @@ void Player::RenderObjects(HDC hdc)
             } else if (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_L ||
                        obj.visual_id == VISUAL_BOSS_BELIAL_HAND_R) {
                 // --- Belial Hands: 4×4 tiles (200px), right hand is flipped ---
-                const int HAND_DRAW = TILE_SIZE * 4;
-                int handFrame = (int)(GetTickCount() / 120) % BOSS_BELIAL_HAND_FRAMES;
-                bool flip = (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_R);
+                const int HAND_DRAW  = TILE_SIZE * 4;
+                bool      flip       = (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_R);
+                bool      isAtk      = (obj.handAnimState == 1);
+                int       handFrame  = isAtk
+                    ? obj.handAttackFrame
+                    : (int)(GetTickCount() / 120) % BOSS_BELIAL_HAND_FRAMES;
                 SpriteManager::DrawHand(hdc, handFrame, screenX, screenY,
-                                        HAND_DRAW, HAND_DRAW, flip);
+                                        HAND_DRAW, HAND_DRAW, flip, isAtk);
 
             } else if (obj.visual_id >= NPC_ABILITY) {
                 // --- Town NPC (Ability / Restaurant / Shop) ---
@@ -1768,6 +1826,43 @@ void Player::DungeonEnter(unsigned char entered, int instance_id, short tileX, s
     mRenderList.clear();
     mSelfDamages.clear();
     mAttackEffects.clear();
+    mLaserCenterY = -1;
+}
+
+void Player::OnHandMoveTo(int objId, short targetX, short targetY, int moveMs)
+{
+    auto it = mRenderList.find(objId);
+    if (it == mRenderList.end()) return;
+    RenderObject& obj = it->second;
+
+    float destPixX = targetX * TILE_SIZE + TILE_SIZE / 2.0f;
+    float destPixY = targetY * TILE_SIZE + TILE_SIZE / 2.0f;
+
+    obj.handLerpFromX  = obj.x;
+    obj.handLerpFromY  = obj.y;
+    obj.targetX        = destPixX;
+    obj.targetY        = destPixY;
+    obj.handLerpStart  = GetTickCount();
+    obj.handLerpDurMs  = moveMs > 0 ? moveMs : 1;
+    obj.handLerping    = true;
+    obj.isMoving       = false;  // disable the generic lerp for hands
+}
+
+void Player::OnLaserFire(short centerY, int /*durationMs*/)
+{
+    // Store the row — laser visibility is driven by hand attack animation frame
+    mLaserCenterY = centerY;
+}
+
+void Player::OnHandAnimState(int objId, unsigned char animState)
+{
+    auto it = mRenderList.find(objId);
+    if (it == mRenderList.end()) return;
+    RenderObject& obj = it->second;
+
+    obj.handAnimState   = animState;
+    obj.handAttackFrame = 0;
+    obj.handAttackTimer = 0.0f;
 }
 
 // ---------------------------------------------------------------------------

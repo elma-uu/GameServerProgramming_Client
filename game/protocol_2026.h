@@ -84,6 +84,10 @@ enum PACKET_TYPE {
 
 	C2S_USE_ITEM,		//	use item from inventory
 	S2C_USE_ITEM_RESULT,//	item use result (effect + remaining count)
+
+	S2C_HAND_MOVE_TO,	//	boss hand smooth movement
+	S2C_LASER_FIRE,		//	laser fires at dungeon row y
+	S2C_HAND_ANIM_STATE,//	switch boss hand anim state (0=idle 1=attack)
 };
 
 enum STAT_TYPE : unsigned char {
@@ -378,6 +382,29 @@ struct S2C_DungeonEnter {
 	int           instance_id;  // -1 if exited
 	short         x;            // spawn tile X
 	short         y;            // spawn tile Y
+};
+
+struct S2C_HandMoveTo {
+	unsigned char size;
+	PACKET_TYPE   type;
+	int           object_id;
+	short         target_x;
+	short         target_y;
+	int           move_ms;
+};
+
+struct S2C_LaserFire {
+	unsigned char size;
+	PACKET_TYPE   type;
+	short         center_y;
+	int           duration_ms;
+};
+
+struct S2C_HandAnimState {
+	unsigned char size;
+	PACKET_TYPE   type;
+	int           object_id;
+	unsigned char anim_state;  // 0=idle  1=attack
 };
 
 #pragma pack(pop) // Restore default packing

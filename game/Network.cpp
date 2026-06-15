@@ -252,6 +252,24 @@ void Network::ProcessPacket(char* recv_packet)
 		                                  pkt->new_hp, pkt->new_x, pkt->new_y);
 	}
 	break;
+	case S2C_HAND_MOVE_TO:
+	{
+		S2C_HandMoveTo* pkt = reinterpret_cast<S2C_HandMoveTo*>(recv_packet);
+		GAME.GetAvatar()->OnHandMoveTo(pkt->object_id, pkt->target_x, pkt->target_y, pkt->move_ms);
+	}
+	break;
+	case S2C_LASER_FIRE:
+	{
+		S2C_LaserFire* pkt = reinterpret_cast<S2C_LaserFire*>(recv_packet);
+		GAME.GetAvatar()->OnLaserFire(pkt->center_y, pkt->duration_ms);
+	}
+	break;
+	case S2C_HAND_ANIM_STATE:
+	{
+		S2C_HandAnimState* pkt = reinterpret_cast<S2C_HandAnimState*>(recv_packet);
+		GAME.GetAvatar()->OnHandAnimState(pkt->object_id, pkt->anim_state);
+	}
+	break;
 	default:
 		// Unknown Packet Type
 		break;

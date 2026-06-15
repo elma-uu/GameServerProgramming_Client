@@ -8,6 +8,9 @@ Gdiplus::Bitmap*           SpriteManager::sUiImages[5]               = {};
 Gdiplus::Bitmap*           SpriteManager::sItemImages[2]             = {};
 Gdiplus::Bitmap*           SpriteManager::sBossIdle                  = nullptr;
 Gdiplus::Bitmap*           SpriteManager::sBossHand                  = nullptr;
+Gdiplus::Bitmap*           SpriteManager::sBossHandAttack            = nullptr;
+Gdiplus::Bitmap*           SpriteManager::sBossLaserHead             = nullptr;
+Gdiplus::Bitmap*           SpriteManager::sBossLaserBody             = nullptr;
 bool         SpriteManager::sLoaded       = false;
 ULONG_PTR    SpriteManager::sGdiplusToken = 0;
 
@@ -97,6 +100,22 @@ void SpriteManager::Init()
     if (!bossDir.empty()) {
         sBossIdle = LoadBossSheet(bossDir);
         sBossHand = LoadHandSheet(bossDir);
+
+        // Hand attack sheet: Resource/Boss/Belial/Hand/attack.png
+        std::wstring attackPath = bossDir + L"Hand\\attack.png";
+        sBossHandAttack = Gdiplus::Bitmap::FromFile(attackPath.c_str());
+        if (sBossHandAttack && sBossHandAttack->GetLastStatus() != Gdiplus::Ok) {
+            delete sBossHandAttack; sBossHandAttack = nullptr;
+        }
+
+        // Laser sprites: Resource/Boss/Belial/Laser/head.png + body.png
+        auto loadLaser = [](const std::wstring& path) -> Gdiplus::Bitmap* {
+            Gdiplus::Bitmap* b = Gdiplus::Bitmap::FromFile(path.c_str());
+            if (!b || b->GetLastStatus() != Gdiplus::Ok) { delete b; return nullptr; }
+            return b;
+        };
+        sBossLaserHead = loadLaser(bossDir + L"Laser\\head.png");
+        sBossLaserBody = loadLaser(bossDir + L"Laser\\body.png");
     }
 
     sLoaded = true;
@@ -122,8 +141,11 @@ void SpriteManager::Shutdown()
     for (int i = 0; i < 2; ++i) {
         delete sItemImages[i]; sItemImages[i] = nullptr;
     }
-    delete sBossIdle; sBossIdle = nullptr;
-    delete sBossHand; sBossHand = nullptr;
+    delete sBossIdle;       sBossIdle       = nullptr;
+    delete sBossHand;       sBossHand       = nullptr;
+    delete sBossHandAttack; sBossHandAttack = nullptr;
+    delete sBossLaserHead;  sBossLaserHead  = nullptr;
+    delete sBossLaserBody;  sBossLaserBody  = nullptr;
     if (sGdiplusToken) {
         Gdiplus::GdiplusShutdown(sGdiplusToken);
         sGdiplusToken = 0;
@@ -613,14 +635,17 @@ Gdiplus::Bitmap* SpriteManager::LoadHandSheet(const std::wstring& dir)
 }
 
 void SpriteManager::DrawHand(HDC hdc, int frame, int screenX, int screenY,
-                              int drawW, int drawH, bool flipH)
+                              int drawW, int drawH, bool flipH, bool isAttacking)
 {
     int destX = screenX - drawW / 2;
     int destY = screenY - drawH / 2;
 
-    if (!sBossHand) {
-        // Fallback: dark purple rectangle
-        HBRUSH br  = CreateSolidBrush(RGB(80, 0, 120));
+    Gdiplus::Bitmap* sheet    = isAttacking ? sBossHandAttack : sBossHand;
+    int              numFrames = isAttacking ? BOSS_BELIAL_HAND_ATTACK_FRAMES
+                                             : BOSS_BELIAL_HAND_FRAMES;
+
+    if (!sheet) {
+        HBRUSH br  = CreateSolidBrush(isAttacking ? RGB(200, 80, 0) : RGB(80, 0, 120));
         HBRUSH old = (HBRUSH)SelectObject(hdc, br);
         Rectangle(hdc, destX, destY, destX + drawW, destY + drawH);
         SelectObject(hdc, old);
@@ -631,6 +656,83 @@ void SpriteManager::DrawHand(HDC hdc, int frame, int screenX, int screenY,
     Gdiplus::Graphics g(hdc);
     g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
     g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
-    DrawFrame(g, sBossHand, frame % BOSS_BELIAL_HAND_FRAMES, BOSS_BELIAL_HAND_FRAMES,
-              destX, destY, drawW, drawH, flipH);
+    DrawFrame(g, sheet, frame % numFrames, numFrames, destX, destY, drawW, drawH, flipH);
+}
+
+// Draw the laser beam for a given animation frame (0-6).
+// Head sprites are drawn at the hand positions; body fills between them.
+// Left hand head is drawn normally; right hand head is flipped horizontally.
+void SpriteManager::DrawLaser(HDC hdc, int screenCenterY, int leftHandX, int rightHandX,
+                               int tileH, int laserFrame)
+{
+    constexpr int LASER_FRAMES = 7;
+    int frame = max(0, min(laserFrame, LASER_FRAMES - 1));
+
+    // Laser visual height = 3 tiles (center ± 1)
+    int laserH = tileH * 3;
+    int top    = screenCenterY - laserH / 2;
+
+    // Head width: use sprite's natural per-frame width if loaded, else 1 tile
+    int headW = tileH;
+    if (sBossLaserHead) {
+        UINT sw = sBossLaserHead->GetWidth();
+        UINT sh = sBossLaserHead->GetHeight();
+        if (sh > 0) headW = (int)((float)sw / LASER_FRAMES * laserH / sh);
+    }
+
+    int bodyLeft  = leftHandX  + headW / 2;
+    int bodyRight = rightHandX - headW / 2;
+    int bodyW     = bodyRight - bodyLeft;
+
+    Gdiplus::Graphics g(hdc);
+    g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+    g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+
+    if (sBossLaserBody && bodyW > 0) {
+        // Tile the body sprite between the two heads
+        UINT sw = sBossLaserBody->GetWidth();
+        UINT sh = sBossLaserBody->GetHeight();
+        if (sw > 0 && sh > 0) {
+            int segW = (int)((float)sw / LASER_FRAMES * laserH / sh);
+            if (segW < 1) segW = 1;
+            for (int x = bodyLeft; x < bodyRight; x += segW) {
+                int w = min(segW, bodyRight - x);
+                Gdiplus::Rect dest(x, top, w, laserH);
+                // Source: one frame column from the body sheet
+                INT srcX = (INT)((float)sw / LASER_FRAMES * frame);
+                INT srcW = (INT)((float)sw / LASER_FRAMES);
+                g.DrawImage(sBossLaserBody, dest,
+                            srcX, 0, srcW, (INT)sh, Gdiplus::UnitPixel);
+            }
+        }
+    } else if (!sBossLaserBody && bodyW > 0) {
+        // Fallback body
+        HPEN np = (HPEN)GetStockObject(NULL_PEN);
+        HPEN op = (HPEN)SelectObject(hdc, np);
+        HBRUSH br = CreateSolidBrush(RGB(255, 40, 40));
+        HBRUSH ob = (HBRUSH)SelectObject(hdc, br);
+        Rectangle(hdc, bodyLeft, top, bodyRight, top + laserH);
+        SelectObject(hdc, ob); SelectObject(hdc, op);
+        DeleteObject(br);
+    }
+
+    auto drawHead = [&](int centerX, bool flipH) {
+        int destX = centerX - headW / 2;
+        if (sBossLaserHead) {
+            DrawFrame(g, sBossLaserHead, frame, LASER_FRAMES,
+                      destX, top, headW, laserH, flipH);
+        } else {
+            // Fallback head
+            HPEN np = (HPEN)GetStockObject(NULL_PEN);
+            HPEN op = (HPEN)SelectObject(hdc, np);
+            HBRUSH br = CreateSolidBrush(RGB(255, 140, 0));
+            HBRUSH ob = (HBRUSH)SelectObject(hdc, br);
+            Rectangle(hdc, destX, top, destX + headW, top + laserH);
+            SelectObject(hdc, ob); SelectObject(hdc, op);
+            DeleteObject(br);
+        }
+    };
+
+    drawHead(leftHandX,  false);  // left hand head — normal
+    drawHead(rightHandX, true);   // right hand head — flipped
 }

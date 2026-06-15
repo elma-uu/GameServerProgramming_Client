@@ -34,8 +34,9 @@ constexpr MonFrameInfo MON_FRAMES[4] = {
 // Keep legacy constant for existing code that uses it
 constexpr int MON_IDLE_FRAMES = 5;
 
-constexpr int BOSS_BELIAL_IDLE_FRAMES = 10;
-constexpr int BOSS_BELIAL_HAND_FRAMES = 10;
+constexpr int BOSS_BELIAL_IDLE_FRAMES        = 10;
+constexpr int BOSS_BELIAL_HAND_FRAMES        = 10;
+constexpr int BOSS_BELIAL_HAND_ATTACK_FRAMES = 18;
 
 class SpriteManager
 {
@@ -70,8 +71,16 @@ public:
     // Draw Belial boss Head idle frame centered at (screenX, screenY).
     static void DrawBoss(HDC hdc, int frame, int screenX, int screenY, int drawW, int drawH);
 
-    // Draw Belial boss Hand idle frame. flipH=true for right hand.
-    static void DrawHand(HDC hdc, int frame, int screenX, int screenY, int drawW, int drawH, bool flipH);
+    // Draw Belial boss Hand frame. flipH=true for right hand.
+    // isAttacking=true uses the attack sprite sheet (18 frames).
+    static void DrawHand(HDC hdc, int frame, int screenX, int screenY, int drawW, int drawH,
+                         bool flipH, bool isAttacking = false);
+
+    // Draw laser beam. laserFrame 0-6 (same speed as hand attack anim).
+    // leftHandScreenX / rightHandScreenX: screen-space X of each hand center.
+    // Laser head drawn at each hand, body fills between them.
+    static void DrawLaser(HDC hdc, int screenCenterY, int leftHandX, int rightHandX,
+                          int tileH, int laserFrame);
 
     static bool IsLoaded() { return sLoaded; }
 
@@ -109,7 +118,10 @@ private:
 
     // ---- boss sprites (Resource/Boss/Belial/) ----
     static Gdiplus::Bitmap* sBossIdle;
-    static Gdiplus::Bitmap* sBossHand;
+    static Gdiplus::Bitmap* sBossHand;        // Hand/idle.png
+    static Gdiplus::Bitmap* sBossHandAttack;  // Hand/attack.png
+    static Gdiplus::Bitmap* sBossLaserHead;   // Laser/head.png  (7 frames)
+    static Gdiplus::Bitmap* sBossLaserBody;   // Laser/body.png  (7 frames)
     static std::wstring FindBossDir();
     static Gdiplus::Bitmap* LoadBossSheet(const std::wstring& dir);
     static Gdiplus::Bitmap* LoadHandSheet(const std::wstring& dir);
