@@ -1,8 +1,15 @@
 #pragma once
 
 constexpr short PORT = 3500;
-constexpr int WORLD_WIDTH = 2000;
+constexpr int WORLD_WIDTH  = 16000; // extended for dungeon instances
 constexpr int WORLD_HEIGHT = 2000;
+
+// Instance dungeon
+constexpr int DUNGEON_BASE_X        = 2500;
+constexpr int DUNGEON_BASE_Y        = 100;
+constexpr int DUNGEON_SIZE          = 30;
+constexpr int DUNGEON_STRIDE        = 50;
+constexpr int MAX_DUNGEON_INSTANCES = 250;
 constexpr int MAX_PLAYERS = 10000;
 constexpr int NUM_NPCS = 200000;
 constexpr int NPC_ID_START = 1000000;
@@ -62,6 +69,15 @@ enum PACKET_TYPE {
 	S2C_GOLD_UPDATE,	//	Server to Client: gold balance changed (kill reward etc.)
 
 	S2C_RESPAWN,		//	Server to Client: player died and respawned at town
+
+	C2S_QUEST_INTERACT,	//	Client to Server: player pressed F near Quest NPC
+	S2C_QUEST_UPDATE,	//	Server to Client: quest state changed
+
+	C2S_DUNGEON_ENTER,	//	party leader enters; any member exits when inside
+	S2C_DUNGEON_ENTER,	//	server teleports player into / out of dungeon
+
+	C2S_USE_ITEM,		//	use item from inventory
+	S2C_USE_ITEM_RESULT,//	item use result (effect + remaining count)
 };
 
 enum STAT_TYPE : unsigned char {
@@ -310,6 +326,52 @@ struct S2C_Respawn {
 	int           max_hp;
 	short         x;
 	short         y;
+};
+
+struct C2S_QuestInteract {
+	unsigned char size;
+	PACKET_TYPE   type;
+};
+
+// quest_state: 0=none 1=in_progress 2=complete(ready_to_hand_in) 3=done
+struct S2C_QuestUpdate {
+	unsigned char size;
+	PACKET_TYPE   type;
+	unsigned char quest_id;
+	unsigned char quest_state;
+	unsigned char progress;
+	unsigned char goal;
+};
+
+struct C2S_UseItem {
+	unsigned char size;
+	PACKET_TYPE   type;
+	ITEM_TYPE     item_type;
+};
+
+struct S2C_UseItemResult {
+	unsigned char size;
+	PACKET_TYPE   type;
+	unsigned char success;
+	ITEM_TYPE     item_type;
+	int           item_count;
+	int           new_hp;
+	short         new_x;
+	short         new_y;
+};
+
+struct C2S_DungeonEnter {
+	unsigned char size;
+	PACKET_TYPE   type;
+};
+
+struct S2C_DungeonEnter {
+	unsigned char size;
+	PACKET_TYPE   type;
+	unsigned char entered;      // 1 = entered dungeon, 0 = exited to town
+	int           instance_id;  // -1 if exited
+	short         x;            // spawn tile X
+	short         y;            // spawn tile Y
 };
 
 #pragma pack(pop) // Restore default packing

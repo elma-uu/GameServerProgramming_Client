@@ -84,9 +84,24 @@ public:
     void RenderPartyPanel(HDC hdc);
     void RenderPartyUI(HDC hdc);
 
-    // Shop
+    // Shop / inventory
     void SetGold(int g) { mGold = g; }
-    void OnBuyResult(unsigned char success, ITEM_TYPE item, int gold, int newHp, short newX, short newY);
+    // OnBuyResult: new_hp is reused as item_count after purchase
+    void OnBuyResult(unsigned char success, ITEM_TYPE item, int gold, int itemCount, short unused_x, short unused_y);
+    void SendUseItemPacket(ITEM_TYPE itemType);
+    void OnUseItemResult(unsigned char success, ITEM_TYPE item, int itemCount,
+                         int newHp, short newX, short newY);
+
+    // Quest
+    void OnQuestUpdate(unsigned char questId, unsigned char state,
+                       unsigned char progress, unsigned char goal);
+    void RenderQuestPanel(HDC hdc) const;
+
+    // Dungeon
+    void SendDungeonEnterPacket();
+    void DungeonEnter(unsigned char entered, int instance_id, short tileX, short tileY);
+    bool IsInDungeon() const { return mIsInDungeon; }
+
     void SendPartyCreate();
     void SendPartyJoin(int partyId);
     void SendPartyLeave();
@@ -158,11 +173,14 @@ private:
     // --- private helpers ---
     DIRECTION GetMouseDirection()      const;
     void      RenderAttackEffects(HDC hdc) const;
+    void      RenderDungeonOverlay(HDC hdc);
     void      RenderAbilityUI(HDC hdc);
     bool      IsNearAbilityNpc() const;
     void      RenderShopUI(HDC hdc);
     bool      IsNearShopNpc() const;
+    bool      IsNearQuestNpc() const;
     bool      IsInSafeZone() const;
+    void      SendQuestInteractPacket();
 
     // --- data members ---
     int                playerID  = -1;
@@ -206,7 +224,21 @@ private:
 
     // Economy
     int   mGold              = 0;
-    float mPotionCooldown    = 0.0f;
+    int   mPotionCount       = 0;   // HP potions in inventory
+    int   mScrollCount       = 0;   // teleport scrolls in inventory
+    float mPotionCooldown    = 0.0f; // use cooldown (not buy cooldown)
+
+    // Quest state (mirrors server QuestEntry)
+    struct QuestEntry {
+        unsigned char state    = 0;
+        unsigned char progress = 0;
+        unsigned char goal     = 0;
+    };
+    QuestEntry mQuests[2];  // [0]=tutorial  [1]=kill quest
+
+    // Dungeon state
+    bool mIsInDungeon       = false;
+    int  mDungeonInstanceId = -1;
 
     // Party state
     int                       mPartyId          = -1;

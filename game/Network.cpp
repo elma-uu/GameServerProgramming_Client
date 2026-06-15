@@ -232,10 +232,55 @@ void Network::ProcessPacket(char* recv_packet)
 		GAME.GetAvatar()->Respawn(pkt->hp, pkt->max_hp, pkt->x, pkt->y);
 	}
 	break;
+	case S2C_QUEST_UPDATE:
+	{
+		S2C_QuestUpdate* pkt = reinterpret_cast<S2C_QuestUpdate*>(recv_packet);
+		GAME.GetAvatar()->OnQuestUpdate(pkt->quest_id, pkt->quest_state,
+		                                pkt->progress, pkt->goal);
+	}
+	break;
+	case S2C_DUNGEON_ENTER:
+	{
+		S2C_DungeonEnter* pkt = reinterpret_cast<S2C_DungeonEnter*>(recv_packet);
+		GAME.GetAvatar()->DungeonEnter(pkt->entered, pkt->instance_id, pkt->x, pkt->y);
+	}
+	break;
+	case S2C_USE_ITEM_RESULT:
+	{
+		S2C_UseItemResult* pkt = reinterpret_cast<S2C_UseItemResult*>(recv_packet);
+		GAME.GetAvatar()->OnUseItemResult(pkt->success, pkt->item_type, pkt->item_count,
+		                                  pkt->new_hp, pkt->new_x, pkt->new_y);
+	}
+	break;
 	default:
 		// Unknown Packet Type
 		break;
 	}
+}
+
+void SendQuestInteractToServer()
+{
+	C2S_QuestInteract pkt;
+	pkt.size = sizeof(C2S_QuestInteract);
+	pkt.type = C2S_QUEST_INTERACT;
+	GAME.GetNetwork()->Send(reinterpret_cast<void*>(&pkt));
+}
+
+void SendDungeonEnterToServer()
+{
+	C2S_DungeonEnter pkt;
+	pkt.size = sizeof(C2S_DungeonEnter);
+	pkt.type = C2S_DUNGEON_ENTER;
+	GAME.GetNetwork()->Send(reinterpret_cast<void*>(&pkt));
+}
+
+void SendUseItemToServer(ITEM_TYPE t)
+{
+	C2S_UseItem pkt;
+	pkt.size      = sizeof(C2S_UseItem);
+	pkt.type      = C2S_USE_ITEM;
+	pkt.item_type = t;
+	GAME.GetNetwork()->Send(reinterpret_cast<void*>(&pkt));
 }
 
 void SendBuyItemToServer(ITEM_TYPE t)

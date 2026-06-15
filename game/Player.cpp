@@ -61,7 +61,7 @@ void Player::Update()
         }
     }
 
-    // F key: open/close NPC UI (Ability or Shop)
+    // F key: open/close NPC UI (Ability, Shop, or Quest)
     if (Input::GetKeyDown(eKeyCode::F)) {
         if (mShowAbilityUI) {
             mShowAbilityUI = false;
@@ -71,6 +71,8 @@ void Player::Update()
             mShowAbilityUI = true;
         } else if (IsNearShopNpc()) {
             mShowShopUI = true;
+        } else if (IsNearQuestNpc()) {
+            SendQuestInteractPacket();
         }
     }
 
@@ -183,14 +185,23 @@ void Player::Update()
         mAoeCooldown = 3.0f;
     }
 
-    // stat investment: press 1-4 only while inside the town safe zone
-    if (mStatPoints > 0 && IsInSafeZone())
+    // G key: enter dungeon (party leader near Quest NPC) or exit dungeon
+    if (Input::GetKeyDown(eKeyCode::G))
     {
-        if (Input::GetKeyDown(eKeyCode::Key1)) SendStatInvestPacket(STAT_STR);
-        if (Input::GetKeyDown(eKeyCode::Key2)) SendStatInvestPacket(STAT_INT);
-        if (Input::GetKeyDown(eKeyCode::Key3)) SendStatInvestPacket(STAT_DEX);
-        if (Input::GetKeyDown(eKeyCode::Key4)) SendStatInvestPacket(STAT_LUK);
+        if (mIsInDungeon) {
+            SendDungeonEnterPacket();
+        } else if (IsNearQuestNpc() && mPartyId >= 0) {
+            SendDungeonEnterPacket();
+        }
     }
+
+    // 1 key: use HP Potion from inventory
+    if (Input::GetKeyDown(eKeyCode::Key1) && mPotionCount > 0 && mPotionCooldown <= 0.0f)
+        SendUseItemPacket(ITEM_HP_POTION);
+
+    // 2 key: use Teleport Scroll from inventory
+    if (Input::GetKeyDown(eKeyCode::Key2) && mScrollCount > 0)
+        SendUseItemPacket(ITEM_TELEPORT_SCROLL);
 
     float dt = Time::DeltaTime();
 
@@ -214,16 +225,27 @@ void Player::Update()
         mMoveAccum = 0.0f;
     }
 
-    // Map boundary clamp (2000x2000 tiles = 100,000x100,000 pixels)
-    const int MAP_MAX = 100000;
-    int x = GetX();
-    int y = GetY();
-
-    if (x < 0) SetPosition(0, y);
-    else if (x > MAP_MAX) SetPosition(MAP_MAX, y);
-
-    if (y < 0) SetPosition(x, 0);
-    else if (y > MAP_MAX) SetPosition(x, MAP_MAX);
+    // Map boundary clamp — dungeon instances live at X >= DUNGEON_BASE_X
+    if (mIsInDungeon && mDungeonInstanceId >= 0) {
+        int dMinX = (DUNGEON_BASE_X + mDungeonInstanceId * DUNGEON_STRIDE) * TILE_SIZE;
+        int dMaxX = dMinX + (DUNGEON_SIZE - 1) * TILE_SIZE + TILE_SIZE / 2;
+        int dMinY = DUNGEON_BASE_Y * TILE_SIZE;
+        int dMaxY = dMinY + (DUNGEON_SIZE - 1) * TILE_SIZE + TILE_SIZE / 2;
+        int cx = GetX(), cy = GetY();
+        if (cx < dMinX) SetPosition(dMinX, GetY());
+        else if (cx > dMaxX) SetPosition(dMaxX, GetY());
+        cy = GetY();
+        if (cy < dMinY) SetPosition(GetX(), dMinY);
+        else if (cy > dMaxY) SetPosition(GetX(), dMaxY);
+    } else {
+        const int MAP_MAX = 100000; // 2000 tiles * 50 px
+        int x = GetX();
+        int y = GetY();
+        if (x < 0) SetPosition(0, y);
+        else if (x > MAP_MAX) SetPosition(MAP_MAX, y);
+        if (y < 0) SetPosition(x, 0);
+        else if (y > MAP_MAX) SetPosition(x, MAP_MAX);
+    }
 
     // Sprite animation — track movement & facing direction
     bool movingNow = Input::GetKey(eKeyCode::A) || Input::GetKey(eKeyCode::D) ||
@@ -390,7 +412,9 @@ void Player::Render(HDC hdc)
         DrawHpBar(hdc, screenX, footY + 14, GetHp(), mMaxHp > 0 ? mMaxHp : 1);
     }
 
+    RenderDungeonOverlay(hdc);
     RenderAttackEffects(hdc);
+    RenderQuestPanel(hdc);
 
     // Damage numbers from monster attacks (shown near our avatar)
     if (!mSelfDamages.empty()) {
@@ -692,45 +716,73 @@ void Player::RenderStats(HDC hdc)
     const int PW = 195;
     const int LH = 18;
 
-    int rows = mStatPoints > 0 ? 6 : 4;
+    // rows: 4 stats + points + gold + divider + 2 inventory rows + hint row
+    const int TOTAL_ROWS = 9;
 
     HBRUSH bgBrush = CreateSolidBrush(RGB(20, 20, 20));
     HPEN nullPen   = (HPEN)GetStockObject(NULL_PEN);
     HBRUSH oldBr   = (HBRUSH)SelectObject(hdc, bgBrush);
     HPEN oldPen    = (HPEN)SelectObject(hdc, nullPen);
-    Rectangle(hdc, PX - 2, PY - 2, PX + PW + 2, PY + rows * LH + 4);
+    Rectangle(hdc, PX - 2, PY - 2, PX + PW + 2, PY + TOTAL_ROWS * LH + 4);
     SelectObject(hdc, oldBr);
     SelectObject(hdc, oldPen);
     DeleteObject(bgBrush);
 
     SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, RGB(200, 220, 255));
 
+    // ── Stats ─────────────────────────────────────────────
+    SetTextColor(hdc, RGB(200, 220, 255));
     char buf[64];
     sprintf_s(buf, "STR:%3d   INT:%3d", (int)mStr, (int)mIntl);
-    TextOutA(hdc, PX + 4, PY, buf, static_cast<int>(strlen(buf)));
+    TextOutA(hdc, PX + 4, PY, buf, (int)strlen(buf));
 
     sprintf_s(buf, "DEX:%3d   LUK:%3d", (int)mDex, (int)mLuk);
-    TextOutA(hdc, PX + 4, PY + LH, buf, static_cast<int>(strlen(buf)));
+    TextOutA(hdc, PX + 4, PY + LH, buf, (int)strlen(buf));
 
-    sprintf_s(buf, "Points: %d", (int)mStatPoints);
     SetTextColor(hdc, mStatPoints > 0 ? RGB(255, 255, 80) : RGB(150, 150, 150));
-    TextOutA(hdc, PX + 4, PY + LH * 2, buf, static_cast<int>(strlen(buf)));
+    sprintf_s(buf, "Points: %d", (int)mStatPoints);
+    TextOutA(hdc, PX + 4, PY + LH * 2, buf, (int)strlen(buf));
 
-    // Gold display
     SetTextColor(hdc, RGB(255, 210, 60));
-    char goldBuf[32];
-    sprintf_s(goldBuf, "Gold: %d", mGold);
-    TextOutA(hdc, PX + 4, PY + LH * 3, goldBuf, static_cast<int>(strlen(goldBuf)));
+    sprintf_s(buf, "Gold: %d", mGold);
+    TextOutA(hdc, PX + 4, PY + LH * 3, buf, (int)strlen(buf));
 
-    if (mStatPoints > 0)
-    {
-        SetTextColor(hdc, RGB(180, 255, 180));
-        const char* hint1 = "1:STR  2:INT";
-        const char* hint2 = "3:DEX  4:LUK";
-        TextOutA(hdc, PX + 4, PY + LH * 4, hint1, static_cast<int>(strlen(hint1)));
-        TextOutA(hdc, PX + 4, PY + LH * 5, hint2, static_cast<int>(strlen(hint2)));
+    // ── Divider ───────────────────────────────────────────
+    HPEN divPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 80));
+    HPEN oldDiv = (HPEN)SelectObject(hdc, divPen);
+    MoveToEx(hdc, PX + 2, PY + LH * 4 + 4, nullptr);
+    LineTo(hdc,   PX + PW - 2, PY + LH * 4 + 4);
+    SelectObject(hdc, oldDiv);
+    DeleteObject(divPen);
+
+    // ── Inventory ─────────────────────────────────────────
+    int invY = PY + LH * 4 + 10;
+
+    // Potion row
+    bool canUsePotion = (mPotionCount > 0 && mPotionCooldown <= 0.0f);
+    SetTextColor(hdc, canUsePotion ? RGB(100, 220, 100) : RGB(120, 120, 120));
+    sprintf_s(buf, "[1] HP Potion  x%d", mPotionCount);
+    TextOutA(hdc, PX + 4, invY, buf, (int)strlen(buf));
+
+    if (mPotionCooldown > 0.0f) {
+        SetTextColor(hdc, RGB(200, 100, 100));
+        char cdBuf[16];
+        sprintf_s(cdBuf, " %.1fs", mPotionCooldown);
+        TextOutA(hdc, PX + 4, invY + LH - 2, cdBuf, (int)strlen(cdBuf));
+        invY += LH - 2;
     }
+    invY += LH;
+
+    // Scroll row
+    bool canUseScroll = (mScrollCount > 0);
+    SetTextColor(hdc, canUseScroll ? RGB(120, 180, 255) : RGB(120, 120, 120));
+    sprintf_s(buf, "[2] Teleport   x%d", mScrollCount);
+    TextOutA(hdc, PX + 4, invY, buf, (int)strlen(buf));
+    invY += LH;
+
+    // Hint
+    SetTextColor(hdc, RGB(100, 100, 140));
+    TextOutA(hdc, PX + 4, invY + 2, "Buy at Shop NPC", 15);
 }
 
 void Player::SendStatInvestPacket(STAT_TYPE statType)
@@ -1140,25 +1192,52 @@ void Player::SendBuyItemPacket(ITEM_TYPE itemType)
     SendBuyItemToServer(itemType);
 }
 
+void Player::SendUseItemPacket(ITEM_TYPE itemType)
+{
+    extern void SendUseItemToServer(ITEM_TYPE t);
+    SendUseItemToServer(itemType);
+}
+
 // ---------------------------------------------------------------------------
 // Handle buy result from server
 // ---------------------------------------------------------------------------
 
-void Player::OnBuyResult(unsigned char success, ITEM_TYPE item, int gold, int newHp, short newX, short newY)
+// new_hp (itemCount) carries the new inventory count after purchase.
+void Player::OnBuyResult(unsigned char success, ITEM_TYPE item, int gold, int itemCount, short /*unused_x*/, short /*unused_y*/)
 {
     mGold = gold;
     if (!success) return;
 
     if (item == ITEM_HP_POTION) {
+        mPotionCount = itemCount;
+    } else if (item == ITEM_TELEPORT_SCROLL) {
+        mScrollCount = itemCount;
+        mShowShopUI  = false;
+    }
+}
+
+// Called when the server confirms a C2S_USE_ITEM result.
+void Player::OnUseItemResult(unsigned char success, ITEM_TYPE item, int itemCount,
+                              int newHp, short newX, short newY)
+{
+    if (!success) return;
+
+    if (item == ITEM_HP_POTION) {
+        mPotionCount    = itemCount;
         SetHp(newHp);
         mPotionCooldown = 7.0f;
     } else if (item == ITEM_TELEPORT_SCROLL) {
-        // Snap to new tile position
+        mScrollCount = itemCount;
+        // Handle dungeon exit or regular teleport
+        if (mIsInDungeon) {
+            mIsInDungeon       = false;
+            mDungeonInstanceId = -1;
+            mRenderList.clear();
+        }
         SetPosition(newX * TILE_SIZE + TILE_SIZE / 2,
                     newY * TILE_SIZE + TILE_SIZE / 2);
         mLastSentX = newX;
         mLastSentY = newY;
-        mShowShopUI = false;
     }
 }
 
@@ -1213,9 +1292,9 @@ void Player::RenderShopUI(HDC hdc)
     };
     const ShopItem items[2] = {
         { ITEM_HP_POTION,       L"HP 회복 포션",   SHOP_POTION_PRICE,
-          L"HP를 최대치의 33% 회복",  L"(최소 50 HP)"       },
-        { ITEM_TELEPORT_SCROLL, L"순간이동 주문서", SHOP_TELEPORT_PRICE,
-          L"시작 마을로 즉시 이동",   L"(1000, 1000 타일)"  },
+          L"'1' 키로 사용 · 인벤토리에 추가",  L"HP 최대치의 33% 회복 (최소 50)"  },
+        { ITEM_TELEPORT_SCROLL, L"귀환 주문서", SHOP_TELEPORT_PRICE,
+          L"'2' 키로 사용 · 인벤토리에 추가",  L"시작 마을로 즉시 귀환"           },
     };
 
     const int colCX[2] = { 250, 550 };
@@ -1267,9 +1346,8 @@ void Player::RenderShopUI(HDC hdc)
         SelectObject(hdc, oldFont);   // restore
 
         // Buy button
-        bool onCooldown = (i == ITEM_HP_POTION && mPotionCooldown > 0.0f);
-        bool canBuy     = (mGold >= items[i].price) && !onCooldown;
-        HBRUSH btnBr  = CreateSolidBrush(canBuy ? RGB(40, 160, 40) : RGB(80, 80, 80));
+        bool canBuy  = (mGold >= items[i].price);
+        HBRUSH btnBr = CreateSolidBrush(canBuy ? RGB(40, 160, 40) : RGB(80, 80, 80));
         HBRUSH oldBtn = (HBRUSH)SelectObject(hdc, btnBr);
         int bx = cx - btnW / 2;
         Rectangle(hdc, bx, btnY, bx + btnW, btnY + btnH);
@@ -1277,11 +1355,7 @@ void Player::RenderShopUI(HDC hdc)
 
         oldFont = (HFONT)SelectObject(hdc, smFont);
         SetTextColor(hdc, canBuy ? RGB(255, 255, 255) : RGB(140, 140, 140));
-        wchar_t btnBuf[16];
-        if (onCooldown)
-            swprintf_s(btnBuf, L"%.1fs", mPotionCooldown);
-        else
-            wcscpy_s(btnBuf, L"구매");
+        const wchar_t* btnBuf = L"구매";
         int blw = (int)wcslen(btnBuf) * 9;
         TextOutW(hdc, cx - blw / 2, btnY + 9, btnBuf, (int)wcslen(btnBuf));
         SelectObject(hdc, oldFont);   // restore
@@ -1312,6 +1386,137 @@ bool Player::IsNearAbilityNpc() const
             return true;
     }
     return false;
+}
+
+// ---------------------------------------------------------------------------
+// Quest NPC proximity check and interaction
+// ---------------------------------------------------------------------------
+
+bool Player::IsNearQuestNpc() const
+{
+    const int myTileX = GetX() / TILE_SIZE;
+    const int myTileY = GetY() / TILE_SIZE;
+    for (const auto& pair : mRenderList) {
+        const RenderObject& obj = pair.second;
+        if (obj.visual_id != NPC_RESTAURANT) continue;
+        int npcTileX = (int)obj.x / TILE_SIZE;
+        int npcTileY = (int)obj.y / TILE_SIZE;
+        int dx = myTileX - npcTileX;
+        int dy = myTileY - npcTileY;
+        if (dx * dx + dy * dy <= 9)
+            return true;
+    }
+    return false;
+}
+
+void Player::SendQuestInteractPacket()
+{
+    extern void SendQuestInteractToServer();
+    SendQuestInteractToServer();
+}
+
+void Player::OnQuestUpdate(unsigned char questId, unsigned char state,
+                           unsigned char progress, unsigned char goal)
+{
+    if (questId > 1) return;
+    mQuests[questId].state    = state;
+    mQuests[questId].progress = progress;
+    mQuests[questId].goal     = goal;
+}
+
+// ---------------------------------------------------------------------------
+// Quest panel — rendered above the minimap (bottom-right area)
+// Minimap is at (640, 440) size 150x150 per MiniMap.h
+// ---------------------------------------------------------------------------
+
+void Player::RenderQuestPanel(HDC hdc) const
+{
+    // Names displayed to the player (hardcoded Korean; logic/rewards live in quests.lua)
+    static const wchar_t* kQuestNames[2]  = { L"[튜토리얼] 첫 만남", L"[전투] 몬스터 사냥" };
+    static const wchar_t* kQuestGoalDesc[2] = { L"Quest NPC에게 말 걸기", L"몬스터 5마리 처치" };
+
+    // Check if any quest is active (state 1 or 2)
+    bool anyActive = false;
+    for (int i = 0; i < 2; ++i)
+        if (mQuests[i].state == 1 || mQuests[i].state == 2) { anyActive = true; break; }
+    if (!anyActive) return;
+
+    // Panel position: just above minimap (minimap top-left is 640,440)
+    const int PANEL_W = 200;
+    const int PANEL_X = 800 - PANEL_W - 10;  // 590 — align with minimap right edge
+    int panelH = 10;
+    for (int i = 0; i < 2; ++i)
+        if (mQuests[i].state >= 1 && mQuests[i].state <= 2) panelH += 42;
+    const int PANEL_Y = 440 - panelH - 6;    // 6px gap above minimap
+
+    // Background
+    HBRUSH bgBr = CreateSolidBrush(RGB(10, 10, 30));
+    HPEN   bgPn = CreatePen(PS_SOLID, 1, RGB(80, 120, 200));
+    HBRUSH ob   = (HBRUSH)SelectObject(hdc, bgBr);
+    HPEN   op   = (HPEN)SelectObject(hdc, bgPn);
+    Rectangle(hdc, PANEL_X, PANEL_Y, PANEL_X + PANEL_W, PANEL_Y + panelH);
+    SelectObject(hdc, ob); SelectObject(hdc, op);
+    DeleteObject(bgBr); DeleteObject(bgPn);
+
+    SetBkMode(hdc, TRANSPARENT);
+
+    HFONT titleFont = CreateFontW(13, 0, 0, 0, FW_BOLD, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT descFont  = CreateFontW(12, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
+    HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
+
+    int rowY = PANEL_Y + 6;
+    for (int i = 0; i < 2; ++i) {
+        if (mQuests[i].state < 1 || mQuests[i].state > 2) continue;
+
+        bool complete = (mQuests[i].state == 2);
+
+        // Quest name
+        SelectObject(hdc, titleFont);
+        SetTextColor(hdc, complete ? RGB(100, 255, 100) : RGB(200, 200, 255));
+        TextOutW(hdc, PANEL_X + 6, rowY, kQuestNames[i], (int)wcslen(kQuestNames[i]));
+        rowY += 16;
+
+        // Progress line
+        SelectObject(hdc, descFont);
+        if (i == 0) {
+            // Tutorial: just "완료! NPC에게 돌아가기" when complete
+            const wchar_t* txt = complete ? L"완료! NPC에게 돌아가기 [F]" : kQuestGoalDesc[i];
+            SetTextColor(hdc, complete ? RGB(80, 220, 80) : RGB(160, 160, 200));
+            TextOutW(hdc, PANEL_X + 8, rowY, txt, (int)wcslen(txt));
+        } else {
+            // Kill quest: show X/Y progress bar
+            wchar_t progBuf[48];
+            if (complete)
+                swprintf_s(progBuf, L"완료! NPC에게 돌아가기 [F]");
+            else
+                swprintf_s(progBuf, L"%d / %d 처치", (int)mQuests[i].progress, (int)mQuests[i].goal);
+            SetTextColor(hdc, complete ? RGB(80, 220, 80) : RGB(200, 180, 100));
+            TextOutW(hdc, PANEL_X + 8, rowY, progBuf, (int)wcslen(progBuf));
+
+            if (!complete && mQuests[i].goal > 0) {
+                // Small progress bar
+                const int BAR_W = PANEL_W - 16, BAR_H = 4;
+                int fillW = BAR_W * (int)mQuests[i].progress / (int)mQuests[i].goal;
+                HPEN   np  = (HPEN)GetStockObject(NULL_PEN);
+                HBRUSH barbg = CreateSolidBrush(RGB(40, 40, 80));
+                HBRUSH barfg = CreateSolidBrush(RGB(100, 200, 100));
+                HBRUSH oob = (HBRUSH)SelectObject(hdc, barbg);
+                HPEN   oop = (HPEN)SelectObject(hdc, np);
+                Rectangle(hdc, PANEL_X + 8, rowY + 14, PANEL_X + 8 + BAR_W, rowY + 14 + BAR_H);
+                SelectObject(hdc, barfg);
+                if (fillW > 0) Rectangle(hdc, PANEL_X + 8, rowY + 14, PANEL_X + 8 + fillW, rowY + 14 + BAR_H);
+                SelectObject(hdc, oob); SelectObject(hdc, oop);
+                DeleteObject(barbg); DeleteObject(barfg);
+            }
+        }
+        rowY += 26;
+    }
+
+    SelectObject(hdc, oldFont);
+    DeleteObject(titleFont);
+    DeleteObject(descFont);
 }
 
 // ---------------------------------------------------------------------------
@@ -1439,4 +1644,108 @@ void Player::RenderAbilityUI(HDC hdc)
 
     DeleteObject(nameFont);
     DeleteObject(descFont);
+}
+
+// ---------------------------------------------------------------------------
+// Dungeon: send entry / exit request to server
+// ---------------------------------------------------------------------------
+
+void Player::SendDungeonEnterPacket()
+{
+    extern void SendDungeonEnterToServer();
+    SendDungeonEnterToServer();
+}
+
+// Called when server confirms dungeon entry or exit.
+void Player::DungeonEnter(unsigned char entered, int instance_id, short tileX, short tileY)
+{
+    mIsInDungeon       = (entered == 1);
+    mDungeonInstanceId = instance_id;
+
+    int pixelX = tileX * TILE_SIZE + TILE_SIZE / 2;
+    int pixelY = tileY * TILE_SIZE + TILE_SIZE / 2;
+    SetPosition(pixelX, pixelY);
+    mLastSentX = tileX;
+    mLastSentY = tileY;
+
+    // Clear all rendered objects — the server will re-send what's visible in the new zone.
+    mRenderList.clear();
+    mSelfDamages.clear();
+    mAttackEffects.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Dungeon overlay: dark stone floor + border grid + HUD + hints
+// ---------------------------------------------------------------------------
+
+void Player::RenderDungeonOverlay(HDC hdc)
+{
+    if (!mIsInDungeon || mDungeonInstanceId < 0) {
+        // Show entry hint when near Quest NPC and in a party (not yet inside)
+        if (IsNearQuestNpc() && mPartyId >= 0) {
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, RGB(180, 255, 180));
+            const char* hint = "[G] 던전 입장";
+            TextOutA(hdc, 10, 440, hint, (int)strlen(hint));
+        }
+        return;
+    }
+
+    Camera* camera = GAME.GetCamera();
+
+    // World-space extent of this dungeon instance
+    int worldMinX = (DUNGEON_BASE_X + mDungeonInstanceId * DUNGEON_STRIDE) * TILE_SIZE;
+    int worldMinY = DUNGEON_BASE_Y * TILE_SIZE;
+    int worldMaxX = worldMinX + DUNGEON_SIZE * TILE_SIZE;
+    int worldMaxY = worldMinY + DUNGEON_SIZE * TILE_SIZE;
+
+    int sMinX, sMinY, sMaxX, sMaxY;
+    camera->WorldToScreen(worldMinX, worldMinY, sMinX, sMinY);
+    camera->WorldToScreen(worldMaxX, worldMaxY, sMaxX, sMaxY);
+
+    // Floor fill — dark stone colour
+    HBRUSH floorBr = CreateSolidBrush(RGB(50, 48, 44));
+    HPEN   nullPen  = (HPEN)GetStockObject(NULL_PEN);
+    HBRUSH ob = (HBRUSH)SelectObject(hdc, floorBr);
+    HPEN   op = (HPEN)SelectObject(hdc, nullPen);
+    Rectangle(hdc, sMinX, sMinY, sMaxX, sMaxY);
+    SelectObject(hdc, ob); SelectObject(hdc, op);
+    DeleteObject(floorBr);
+
+    // Tile grid lines
+    HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(70, 68, 64));
+    HPEN og = (HPEN)SelectObject(hdc, gridPen);
+    for (int tx = 0; tx <= DUNGEON_SIZE; ++tx) {
+        int wx = worldMinX + tx * TILE_SIZE;
+        int sx1, sy1, sx2, sy2;
+        camera->WorldToScreen(wx, worldMinY, sx1, sy1);
+        camera->WorldToScreen(wx, worldMaxY, sx2, sy2);
+        MoveToEx(hdc, sx1, sy1, nullptr);
+        LineTo(hdc, sx2, sy2);
+    }
+    for (int ty = 0; ty <= DUNGEON_SIZE; ++ty) {
+        int wy = worldMinY + ty * TILE_SIZE;
+        int sx1, sy1, sx2, sy2;
+        camera->WorldToScreen(worldMinX, wy, sx1, sy1);
+        camera->WorldToScreen(worldMaxX, wy, sx2, sy2);
+        MoveToEx(hdc, sx1, sy1, nullptr);
+        LineTo(hdc, sx2, sy2);
+    }
+    SelectObject(hdc, og);
+    DeleteObject(gridPen);
+
+    // Border wall — bright stone edge
+    HPEN borderPen = CreatePen(PS_SOLID, 3, RGB(160, 140, 100));
+    HPEN obp = (HPEN)SelectObject(hdc, borderPen);
+    SelectObject(hdc, GetStockObject(NULL_BRUSH));
+    Rectangle(hdc, sMinX, sMinY, sMaxX, sMaxY);
+    SelectObject(hdc, obp);
+    DeleteObject(borderPen);
+
+    // HUD: dungeon info at top-left
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, RGB(255, 200, 80));
+    char dunBuf[48];
+    sprintf_s(dunBuf, "[던전 #%d]   G: 나가기", mDungeonInstanceId);
+    TextOutA(hdc, 10, 440, dunBuf, (int)strlen(dunBuf));
 }
