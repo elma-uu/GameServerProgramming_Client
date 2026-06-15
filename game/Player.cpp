@@ -250,6 +250,27 @@ void Player::Update()
             [](const DamageNumber& d) { return d.timeLeft <= 0.0f; }),
         mDamageNumbers.end());
 
+    // Tick self-damage numbers (damage taken from monsters)
+    for (auto& sd : mSelfDamages) {
+        sd.timeLeft -= dt;
+        sd.offsetY  -= 28.0f * dt;
+    }
+    mSelfDamages.erase(
+        std::remove_if(mSelfDamages.begin(), mSelfDamages.end(),
+            [](const SelfDamage& d) { return d.timeLeft <= 0.0f; }),
+        mSelfDamages.end());
+
+    // Tick attack animation timers on render objects
+    for (auto& [id, obj] : mRenderList) {
+        if (obj.isAttacking) {
+            obj.attackTimer -= dt;
+            if (obj.attackTimer <= 0.0f) {
+                obj.isAttacking = false;
+                obj.attackTimer = 0.0f;
+            }
+        }
+    }
+
     // Tick attack effects
     for (auto& fx : mAttackEffects)
         fx.timeLeft -= dt;
@@ -370,6 +391,20 @@ void Player::Render(HDC hdc)
     }
 
     RenderAttackEffects(hdc);
+
+    // Damage numbers from monster attacks (shown near our avatar)
+    if (!mSelfDamages.empty()) {
+        SetBkMode(hdc, TRANSPARENT);
+        for (const auto& sd : mSelfDamages) {
+            char numBuf[16];
+            sprintf_s(numBuf, "-%d", sd.amount);
+            int tx = screenX - (int)(strlen(numBuf) * 4);
+            int ty = screenY - PLAYER_SIZE / 2 - 30 + (int)sd.offsetY;
+            SetTextColor(hdc, RGB(255, 80, 80));
+            TextOutA(hdc, tx, ty, numBuf, (int)strlen(numBuf));
+        }
+    }
+
     RenderObjects(hdc);
     RenderStats(hdc);
     RenderPartyPanel(hdc);
@@ -525,9 +560,9 @@ void Player::RenderObjects(HDC hdc)
             const int  monCenterY = isBig ? screenY - PLAYER_SIZE / 2 : screenY;
             const int  spriteTop  = monCenterY - drawH / 2;  // top pixel of the sprite
 
-            int monFrame = (int)((GetTickCount() / 150) % MON_IDLE_FRAMES);
-            SpriteManager::DrawMonster(hdc, obj.visual_id, obj.isMoving, monFrame,
-                screenX, monCenterY, PLAYER_SIZE, drawH, obj.facingLeft);
+            int monFrame = (int)(GetTickCount() / 150);  // DrawMonster wraps via % totalFrames
+            SpriteManager::DrawMonster(hdc, obj.visual_id, obj.isMoving, obj.isAttacking,
+                monFrame, screenX, monCenterY, PLAYER_SIZE, drawH, obj.facingLeft);
 
             // HP bar just above the sprite top
             DrawHpBar(hdc, screenX, spriteTop - 8, obj.hp, obj.max_hp);
@@ -585,6 +620,23 @@ void Player::RenderObjects(HDC hdc)
 
 void Player::AddDamageNumber(int attackerId, int objectId, int damage, bool isCrit)
 {
+    // Monster attacked us: show damage near our avatar and trigger attack animation
+    if (objectId == playerID) {
+        SelfDamage sd;
+        sd.amount   = damage;
+        sd.timeLeft = 0.8f;
+        sd.offsetY  = 0.0f;
+        mSelfDamages.push_back(sd);
+
+        // Trigger attack sprite on the monster that hit us
+        auto it = mRenderList.find(attackerId);
+        if (it != mRenderList.end()) {
+            it->second.isAttacking = true;
+            it->second.attackTimer = 0.6f;
+        }
+        return;
+    }
+
     DamageNumber dn;
     dn.objectId = objectId;
     dn.amount   = damage;
@@ -1060,6 +1112,22 @@ bool Player::IsInSafeZone() const
     int dx = myTileX - 1000;
     int dy = myTileY - 1000;
     return dx * dx + dy * dy <= SAFE_R * SAFE_R;
+}
+
+// ---------------------------------------------------------------------------
+// Respawn (called when killed by a monster)
+// ---------------------------------------------------------------------------
+
+void Player::Respawn(int hp, int maxHp, short tileX, short tileY)
+{
+    SetHp(hp);
+    mMaxHp = maxHp;
+    int pixelX = tileX * TILE_SIZE + TILE_SIZE / 2;
+    int pixelY = tileY * TILE_SIZE + TILE_SIZE / 2;
+    SetPosition(pixelX, pixelY);
+    mLastSentX = tileX;
+    mLastSentY = tileY;
+    mSelfDamages.clear();
 }
 
 // ---------------------------------------------------------------------------

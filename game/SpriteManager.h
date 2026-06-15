@@ -22,14 +22,14 @@ constexpr int NPC_SHOP_FRAMES       = 4;
 // Per-monster frame counts (measured from actual sprite sheet dimensions)
 // Dog         idle=100/20=5   move=140/20=7
 // Small       idle=14/14=1    move=84/14=6
-// Big_Normal  idle=165/33=5   move=198/33=6
+// Big_Normal  idle=165/33=5   move=198/33=6   attack=6 frames
 // Magician_Ice idle=192/32=6  move=none
-struct MonFrameInfo { int idleFrames; int moveFrames; };
+struct MonFrameInfo { int idleFrames; int moveFrames; int attackFrames; };
 constexpr MonFrameInfo MON_FRAMES[4] = {
-    { 5, 7 },   // Dog
-    { 1, 6 },   // Small
-    { 5, 6 },   // Big_Normal
-    { 6, 0 },   // Magician_Ice (no move sheet)
+    { 5, 7, 0 },   // Dog
+    { 1, 6, 0 },   // Small
+    { 5, 6, 6 },   // Big_Normal — has attack.png
+    { 6, 0, 0 },   // Magician_Ice (no move sheet)
 };
 // Keep legacy constant for existing code that uses it
 constexpr int MON_IDLE_FRAMES = 5;
@@ -48,8 +48,8 @@ public:
     static void DrawPreview(HDC hdc, int charId, int cx, int cy, int size);
 
     // Draw one monster animation frame centered at (screenX, screenY).
-    // isMoving selects move sheet vs idle sheet; flipH mirrors left/right.
-    static void DrawMonster(HDC hdc, int monType, bool isMoving, int frame,
+    // isAttacking takes priority over isMoving for sprite selection.
+    static void DrawMonster(HDC hdc, int monType, bool isMoving, bool isAttacking, int frame,
                             int screenX, int screenY, int drawW, int drawH, bool flipH = false);
 
     // Draw a town NPC sprite (Ability/Restaurant/Shop) centered at (screenX, screenY).
@@ -76,8 +76,9 @@ private:
 
     // ---- monster sprites ----
     struct MonSprites {
-        Gdiplus::Bitmap* idle = nullptr;
-        Gdiplus::Bitmap* move = nullptr;  // nullptr for types that have no move sheet
+        Gdiplus::Bitmap* idle   = nullptr;
+        Gdiplus::Bitmap* move   = nullptr;
+        Gdiplus::Bitmap* attack = nullptr;  // only Big_Normal has this
     };
     static MonSprites   sMonsters[MON_COUNT];
 

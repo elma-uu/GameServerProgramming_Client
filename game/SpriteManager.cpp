@@ -61,6 +61,8 @@ void SpriteManager::Init()
             sMonsters[i].idle = LoadMonBmp(monDir, kMonFolders[i], L"idle");
             sMonsters[i].move = LoadMonBmp(monDir, kMonFolders[i], L"move");
         }
+        // Only Big_Normal has an attack sheet
+        sMonsters[MON_BIG_NORMAL].attack = LoadMonBmp(monDir, L"Big_Normal", L"attack");
     }
 
     // --- town NPC sprites ---
@@ -98,8 +100,9 @@ void SpriteManager::Shutdown()
         delete sSprites[i].run;  sSprites[i].run  = nullptr;
     }
     for (int i = 0; i < MON_COUNT; ++i) {
-        delete sMonsters[i].idle; sMonsters[i].idle = nullptr;
-        delete sMonsters[i].move; sMonsters[i].move = nullptr;
+        delete sMonsters[i].idle;   sMonsters[i].idle   = nullptr;
+        delete sMonsters[i].move;   sMonsters[i].move   = nullptr;
+        delete sMonsters[i].attack; sMonsters[i].attack = nullptr;
     }
     for (int i = 0; i < NPC_TOWN_COUNT; ++i) {
         delete sNpcSheets[i]; sNpcSheets[i] = nullptr;
@@ -425,17 +428,20 @@ void SpriteManager::DrawTownNpc(HDC hdc, int visualId, int frame,
               destX, destY, drawW, drawH, false);
 }
 
-void SpriteManager::DrawMonster(HDC hdc, int monType, bool isMoving, int frame,
+void SpriteManager::DrawMonster(HDC hdc, int monType, bool isMoving, bool isAttacking, int frame,
                                  int screenX, int screenY, int drawW, int drawH, bool flipH)
 {
     if (monType < 0 || monType >= MON_COUNT) monType = MON_DOG;
 
     const MonFrameInfo& fi = MON_FRAMES[monType];
 
-    // Use move sheet if moving and it exists; fall back to idle
+    // Priority: attack > move > idle
     Gdiplus::Bitmap* sheet = nullptr;
     int totalFrames = fi.idleFrames;
-    if (isMoving && sMonsters[monType].move && fi.moveFrames > 0) {
+    if (isAttacking && sMonsters[monType].attack && fi.attackFrames > 0) {
+        sheet       = sMonsters[monType].attack;
+        totalFrames = fi.attackFrames;
+    } else if (isMoving && sMonsters[monType].move && fi.moveFrames > 0) {
         sheet       = sMonsters[monType].move;
         totalFrames = fi.moveFrames;
     } else {

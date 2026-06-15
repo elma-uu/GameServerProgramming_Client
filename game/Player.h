@@ -74,6 +74,9 @@ public:
     // Floating damage numbers + system chat message
     void AddDamageNumber(int attackerId, int objectId, int damage, bool isCrit);
 
+    // Called when the server respawns us after death
+    void Respawn(int hp, int maxHp, short tileX, short tileY);
+
     // Party
     void SetMyUsername(const std::string& name) { mMyUsername = name; }
     void OnPartyUpdate(int partyId, int memberCount, PartyMemberInfo* members);
@@ -112,19 +115,28 @@ private:
 
     struct RenderObject
     {
-        int                object_id  = 0;
+        int                object_id   = 0;
         std::string        obj_name;
-        int                visual_id  = 0;
-        float              x          = 0.0f;
-        float              y          = 0.0f;
-        float              targetX    = 0.0f;
-        float              targetY    = 0.0f;
-        bool               isMoving   = false;
-        bool               facingLeft = false;
-        int                hp         = 0;
-        int                max_hp     = 0;
-        unsigned long long exp        = 0;
-        unsigned char      level      = 1;
+        int                visual_id   = 0;
+        float              x           = 0.0f;
+        float              y           = 0.0f;
+        float              targetX     = 0.0f;
+        float              targetY     = 0.0f;
+        bool               isMoving    = false;
+        bool               facingLeft  = false;
+        bool               isAttacking = false;
+        float              attackTimer = 0.0f;
+        int                hp          = 0;
+        int                max_hp      = 0;
+        unsigned long long exp         = 0;
+        unsigned char      level       = 1;
+    };
+
+    struct SelfDamage
+    {
+        int   amount;
+        float timeLeft;
+        float offsetY;
     };
 
     struct PartyMember
@@ -169,6 +181,7 @@ private:
 
     std::unordered_map<int, RenderObject> mRenderList;
     std::vector<DamageNumber>             mDamageNumbers;
+    std::vector<SelfDamage>               mSelfDamages;
     std::vector<AttackEffect>             mAttackEffects;
 
     // Movement / position tracking

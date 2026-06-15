@@ -226,6 +226,12 @@ void Network::ProcessPacket(char* recv_packet)
 			pkt->new_hp, pkt->new_x, pkt->new_y);
 	}
 	break;
+	case S2C_RESPAWN:
+	{
+		S2C_Respawn* pkt = reinterpret_cast<S2C_Respawn*>(recv_packet);
+		GAME.GetAvatar()->Respawn(pkt->hp, pkt->max_hp, pkt->x, pkt->y);
+	}
+	break;
 	default:
 		// Unknown Packet Type
 		break;
