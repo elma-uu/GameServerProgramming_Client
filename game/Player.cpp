@@ -347,7 +347,10 @@ void Player::Render(HDC hdc)
     int screenX, screenY;
     camera->WorldToScreen(GetX(), GetY(), screenX, screenY);
 
-    // �÷��̾ ȭ�鿡 �׸��� (�簢��) - ���
+    // Draw dungeon floor FIRST — background layer so it doesn't cover entities
+    RenderDungeonOverlay(hdc);
+
+    //�÷��̾ ȭ�鿡 �׸��� (�簢��) - ���
     // Draw player sprite (fallback to coloured rect if sprites not loaded)
     SpriteManager::DrawSprite(hdc, mVisualId, mIsMoving, mAnimFrame,
         screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, mFacingLeft);
@@ -412,7 +415,6 @@ void Player::Render(HDC hdc)
         DrawHpBar(hdc, screenX, footY + 14, GetHp(), mMaxHp > 0 ? mMaxHp : 1);
     }
 
-    RenderDungeonOverlay(hdc);
     RenderAttackEffects(hdc);
     RenderQuestPanel(hdc);
 
