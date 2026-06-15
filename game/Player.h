@@ -15,6 +15,10 @@ public:
     virtual void LateUpdate()      override;
     virtual void Render(HDC hdc)   override;
 
+    void RenderLayer0(HDC hdc);  // Layer 0: background (dungeon overlay)
+    void RenderLayer1(HDC hdc);  // Layer 1: player + monsters + effects
+    void RenderLayer2(HDC hdc);  // Layer 2: HUD / UI panels
+
     // Initial player info from server
     void SetPlayerInfo(const int& id, const int& x, const int& y,
         const int& hp, const int& max_hp,

@@ -8,7 +8,7 @@
 #include <cstdio>
 #include <algorithm>
 
-// Forward declaration — defined later in this file
+// Forward declaration ??defined later in this file
 static void DrawHpBar(HDC hdc, int cx, int top, int hp, int maxHp);
 
 // �� �����Ӵ� �̵� �Ÿ� (�׽�Ʈ��)
@@ -109,7 +109,7 @@ void Player::Update()
             return;
         }
         if (Input::GetKeyDown(eKeyCode::LButton) && mStatPoints > 0 && IsInSafeZone()) {
-            // Plus button rects (x, y, w, h) — must match RenderAbilityUI layout
+            // Plus button rects (x, y, w, h) ??must match RenderAbilityUI layout
             // Panel: x=100, y=90, w=600, h=400
             // 4 columns centered at x = 175, 325, 475, 625
             // Plus button top-y = 330, size 40x40
@@ -225,7 +225,7 @@ void Player::Update()
         mMoveAccum = 0.0f;
     }
 
-    // Map boundary clamp — dungeon instances live at X >= DUNGEON_BASE_X
+    // Map boundary clamp ??dungeon instances live at X >= DUNGEON_BASE_X
     if (mIsInDungeon && mDungeonInstanceId >= 0) {
         int dMinX = (DUNGEON_BASE_X + mDungeonInstanceId * DUNGEON_STRIDE) * TILE_SIZE;
         int dMaxX = dMinX + (DUNGEON_SIZE - 1) * TILE_SIZE + TILE_SIZE / 2;
@@ -247,7 +247,7 @@ void Player::Update()
         else if (y > MAP_MAX) SetPosition(x, MAP_MAX);
     }
 
-    // Sprite animation — track movement & facing direction
+    // Sprite animation ??track movement & facing direction
     bool movingNow = Input::GetKey(eKeyCode::A) || Input::GetKey(eKeyCode::D) ||
                      Input::GetKey(eKeyCode::W) || Input::GetKey(eKeyCode::S);
     mIsMoving = movingNow;
@@ -302,7 +302,7 @@ void Player::Update()
         mAttackEffects.end());
 
     // Smooth interpolation for render objects (monsters & other players)
-    const float MOVE_SPEED = 200.0f; // pixels per second — matches player's 4 tiles/s
+    const float MOVE_SPEED = 200.0f; // pixels per second ??matches player's 4 tiles/s
     for (auto& [id, obj] : mRenderList) {
         if (!obj.isMoving) continue;
         float dx   = obj.targetX - obj.x;
@@ -341,59 +341,23 @@ void Player::LateUpdate()
     }
 }
 
-void Player::Render(HDC hdc)
+// Layer 0 ? background: dungeon floor overlay drawn before any entity
+void Player::RenderLayer0(HDC hdc)
+{
+    RenderDungeonOverlay(hdc);
+}
+
+// Layer 1 ? entities: player sprite, other players/monsters, effects, floating numbers
+void Player::RenderLayer1(HDC hdc)
 {
     Camera* camera = GAME.GetCamera();
     int screenX, screenY;
     camera->WorldToScreen(GetX(), GetY(), screenX, screenY);
 
-    // Draw dungeon floor FIRST — background layer so it doesn't cover entities
-    RenderDungeonOverlay(hdc);
-
-    //�÷��̾ ȭ�鿡 �׸��� (�簢��) - ���
-    // Draw player sprite (fallback to coloured rect if sprites not loaded)
     SpriteManager::DrawSprite(hdc, mVisualId, mIsMoving, mAnimFrame,
         screenX, screenY, PLAYER_SIZE, PLAYER_SIZE, mFacingLeft);
 
     SetBkMode(hdc, TRANSPARENT);
-
-    // HP bar - top left corner
-    {
-        const int BAR_X = 10, BAR_Y = 10, BAR_W = 200, BAR_H = 16;
-        int hp = GetHp(), maxHp = (mMaxHp > 0 ? mMaxHp : 1);
-        int fillW = BAR_W * max(0, hp) / maxHp;
-
-        HPEN nullPen = (HPEN)GetStockObject(NULL_PEN);
-        HBRUSH barBg = CreateSolidBrush(RGB(50, 10, 10));
-        HBRUSH barFg = CreateSolidBrush(RGB(210, 40, 40));
-        HPEN   barPen = CreatePen(PS_SOLID, 1, RGB(120, 120, 120));
-
-        // background
-        HBRUSH ob = (HBRUSH)SelectObject(hdc, barBg);
-        HPEN   op = (HPEN)SelectObject(hdc, nullPen);
-        Rectangle(hdc, BAR_X, BAR_Y, BAR_X + BAR_W, BAR_Y + BAR_H);
-
-        // fill
-        if (fillW > 0) {
-            SelectObject(hdc, barFg);
-            Rectangle(hdc, BAR_X, BAR_Y, BAR_X + fillW, BAR_Y + BAR_H);
-        }
-
-        // border
-        SelectObject(hdc, barPen);
-        SelectObject(hdc, GetStockObject(NULL_BRUSH));
-        Rectangle(hdc, BAR_X, BAR_Y, BAR_X + BAR_W, BAR_Y + BAR_H);
-
-        SelectObject(hdc, ob); SelectObject(hdc, op);
-        DeleteObject(barBg); DeleteObject(barFg); DeleteObject(barPen);
-
-        // HP text centered on bar
-        SetBkMode(hdc, TRANSPARENT);
-        SetTextColor(hdc, RGB(255, 255, 255));
-        char hpBuf[32];
-        sprintf_s(hpBuf, "HP  %d / %d", hp, maxHp);
-        TextOutA(hdc, BAR_X + 4, BAR_Y + 1, hpBuf, (int)strlen(hpBuf));
-    }
 
     // Username above head
     if (!mMyUsername.empty()) {
@@ -404,7 +368,7 @@ void Player::Render(HDC hdc)
             mMyUsername.c_str(), (int)mMyUsername.size());
     }
 
-    // Level text + HP bar below feet
+    // Level label + small HP bar below feet
     {
         const int footY = screenY + PLAYER_SIZE / 2 + 2;
         SetTextColor(hdc, RGB(255, 255, 80));
@@ -416,9 +380,8 @@ void Player::Render(HDC hdc)
     }
 
     RenderAttackEffects(hdc);
-    RenderQuestPanel(hdc);
 
-    // Damage numbers from monster attacks (shown near our avatar)
+    // Damage numbers from monster attacks (float near our avatar)
     if (!mSelfDamages.empty()) {
         SetBkMode(hdc, TRANSPARENT);
         for (const auto& sd : mSelfDamages) {
@@ -431,7 +394,49 @@ void Player::Render(HDC hdc)
         }
     }
 
-    RenderObjects(hdc);
+    RenderObjects(hdc);  // other players, monsters, HP bars, damage numbers
+}
+
+// Layer 2 ? HUD/UI: fixed overlays drawn on top of everything
+void Player::RenderLayer2(HDC hdc)
+{
+    SetBkMode(hdc, TRANSPARENT);
+
+    // HP bar ? fixed top-left corner
+    {
+        const int BAR_X = 10, BAR_Y = 10, BAR_W = 200, BAR_H = 16;
+        int hp = GetHp(), maxHp = (mMaxHp > 0 ? mMaxHp : 1);
+        int fillW = BAR_W * max(0, hp) / maxHp;
+
+        HPEN nullPen = (HPEN)GetStockObject(NULL_PEN);
+        HBRUSH barBg = CreateSolidBrush(RGB(50, 10, 10));
+        HBRUSH barFg = CreateSolidBrush(RGB(210, 40, 40));
+        HPEN   barPen = CreatePen(PS_SOLID, 1, RGB(120, 120, 120));
+
+        HBRUSH ob = (HBRUSH)SelectObject(hdc, barBg);
+        HPEN   op = (HPEN)SelectObject(hdc, nullPen);
+        Rectangle(hdc, BAR_X, BAR_Y, BAR_X + BAR_W, BAR_Y + BAR_H);
+
+        if (fillW > 0) {
+            SelectObject(hdc, barFg);
+            Rectangle(hdc, BAR_X, BAR_Y, BAR_X + fillW, BAR_Y + BAR_H);
+        }
+
+        SelectObject(hdc, barPen);
+        SelectObject(hdc, GetStockObject(NULL_BRUSH));
+        Rectangle(hdc, BAR_X, BAR_Y, BAR_X + BAR_W, BAR_Y + BAR_H);
+
+        SelectObject(hdc, ob); SelectObject(hdc, op);
+        DeleteObject(barBg); DeleteObject(barFg); DeleteObject(barPen);
+
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, RGB(255, 255, 255));
+        char hpBuf[32];
+        sprintf_s(hpBuf, "HP  %d / %d", hp, maxHp);
+        TextOutA(hdc, BAR_X + 4, BAR_Y + 1, hpBuf, (int)strlen(hpBuf));
+    }
+
+    RenderQuestPanel(hdc);
     RenderStats(hdc);
     RenderPartyPanel(hdc);
     RenderPartyUI(hdc);
@@ -439,6 +444,12 @@ void Player::Render(HDC hdc)
     RenderShopUI(hdc);
 }
 
+void Player::Render(HDC hdc)
+{
+    RenderLayer0(hdc);
+    RenderLayer1(hdc);
+    RenderLayer2(hdc);
+}
 void Player::AddObject(int objectId, const std::string& objName, int visualId,
     int x, int y, int hp, int max_hp, unsigned long long exp, unsigned char level)
 {
@@ -634,7 +645,7 @@ void Player::RenderObjects(HDC hdc)
         char numBuf[16];
         sprintf_s(numBuf, "%d", dn.amount);
         int tx = sx - (int)(strlen(numBuf) * 4);
-        // Big_Normal sprites are 2 tiles tall — float damage above the full sprite
+        // Big_Normal sprites are 2 tiles tall ??float damage above the full sprite
         bool isBigMon = (it->second.visual_id == MON_BIG_NORMAL);
         int  dmgBaseY = isBigMon ? sy - PLAYER_SIZE * 3 / 2 : sy - PLAYER_SIZE / 2;
         int ty = dmgBaseY - 30 + (int)dn.offsetY;
@@ -679,21 +690,18 @@ void Player::AddDamageNumber(int attackerId, int objectId, int damage, bool isCr
         if (it != mRenderList.end())
             monName = it->second.obj_name;
 
-        // \uXXXX escapes are encoding-independent — always compile to correct UTF-16
-        // "[system] 플레이어 {id}가 {monster}을(를) 공격해서 {damage} 데미지를 입혔습니다."
+        // \uXXXX escapes are encoding-independent ??always compile to correct UTF-16
+        // "[system] ?�레?�어 {id}가 {monster}??�? 공격?�서 {damage} ?��?지�??�혔?�니??"
         wchar_t wbuf[256];
         if (isCrit)
             swprintf_s(wbuf, 256,
-                L"[system] 플레이어 %d가 %S"
-                L"을(를) 공격해서 %d "
-                L"데미지를 입혔습니다!"
-                L" (크리티컬)",
+                L"[system] Player %d attacked %S"
+                L" for %d damage (CRITICAL)",
                 attackerId, monName.c_str(), damage);
         else
             swprintf_s(wbuf, 256,
-                L"[system] 플레이어 %d가 %S"
-                L"을(를) 공격해서 %d "
-                L"데미지를 입혔습니다.",
+                L"[system] Player %d attacked %S"
+                L" for %d damage",
                 attackerId, monName.c_str(), damage);
 
         // Convert wide string to UTF-8 (matches /utf-8 project encoding)
@@ -732,7 +740,7 @@ void Player::RenderStats(HDC hdc)
 
     SetBkMode(hdc, TRANSPARENT);
 
-    // ── Stats ─────────────────────────────────────────────
+    // ?�?� Stats ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     SetTextColor(hdc, RGB(200, 220, 255));
     char buf[64];
     sprintf_s(buf, "STR:%3d   INT:%3d", (int)mStr, (int)mIntl);
@@ -749,7 +757,7 @@ void Player::RenderStats(HDC hdc)
     sprintf_s(buf, "Gold: %d", mGold);
     TextOutA(hdc, PX + 4, PY + LH * 3, buf, (int)strlen(buf));
 
-    // ── Divider ───────────────────────────────────────────
+    // ?�?� Divider ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     HPEN divPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 80));
     HPEN oldDiv = (HPEN)SelectObject(hdc, divPen);
     MoveToEx(hdc, PX + 2, PY + LH * 4 + 4, nullptr);
@@ -757,7 +765,7 @@ void Player::RenderStats(HDC hdc)
     SelectObject(hdc, oldDiv);
     DeleteObject(divPen);
 
-    // ── Inventory ─────────────────────────────────────────
+    // ?�?� Inventory ?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�
     int invY = PY + LH * 4 + 10;
 
     // Potion row
@@ -1100,7 +1108,7 @@ void Player::RenderAttackEffects(HDC hdc) const
         else
         {
             // --- AOE: expanding ring + 8 radial slashes ---
-            float progress = t;  // 0→1 as effect plays
+            float progress = t;  // 0?? as effect plays
             int   radius   = (int)(80 * progress);
 
             // Expanding ring
@@ -1155,7 +1163,7 @@ bool Player::IsNearShopNpc() const
 }
 
 // ---------------------------------------------------------------------------
-// Safe zone check — matches server TOWN_SAFE_R = 30 tiles around (1000,1000)
+// Safe zone check ??matches server TOWN_SAFE_R = 30 tiles around (1000,1000)
 // ---------------------------------------------------------------------------
 
 bool Player::IsInSafeZone() const
@@ -1268,7 +1276,7 @@ void Player::RenderShopUI(HDC hdc)
         HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
     HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
     SetTextColor(hdc, RGB(120, 220, 120));
-    const wchar_t* title = L"[ 상점 ]";
+        const wchar_t* title = L"[ Stat Investment ]";
     TextOutW(hdc, PX + PW / 2 - 50, PY + 12, title, (int)wcslen(title));
 
     // Gold & close hint
@@ -1276,11 +1284,11 @@ void Player::RenderShopUI(HDC hdc)
         HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
     SelectObject(hdc, smFont);
     wchar_t goldBuf[48];
-    swprintf_s(goldBuf, L"보유 골드: %d G", mGold);
+    swprintf_s(goldBuf, L"Gold: %d G", mGold);
     SetTextColor(hdc, RGB(255, 210, 60));
     TextOutW(hdc, PX + 12, PY + 14, goldBuf, (int)wcslen(goldBuf));
     SetTextColor(hdc, RGB(130, 130, 130));
-    const wchar_t* hint = L"F / ESC: 닫기";
+        const wchar_t* hint = L"F / ESC: Close";
     TextOutW(hdc, PX + PW - 110, PY + 14, hint, (int)wcslen(hint));
     DeleteObject(SelectObject(hdc, oldFont));
 
@@ -1293,10 +1301,10 @@ void Player::RenderShopUI(HDC hdc)
         const wchar_t* desc2;
     };
     const ShopItem items[2] = {
-        { ITEM_HP_POTION,       L"HP 회복 포션",   SHOP_POTION_PRICE,
-          L"'1' 키로 사용 · 인벤토리에 추가",  L"HP 최대치의 33% 회복 (최소 50)"  },
-        { ITEM_TELEPORT_SCROLL, L"귀환 주문서", SHOP_TELEPORT_PRICE,
-          L"'2' 키로 사용 · 인벤토리에 추가",  L"시작 마을로 즉시 귀환"           },
+        { ITEM_HP_POTION,       L"HP Potion",       SHOP_POTION_PRICE,
+          L"Use '1' key  *  adds to inventory",  L"Restores 33pct of max HP (min 50)"  },
+        { ITEM_TELEPORT_SCROLL, L"Teleport Scroll", SHOP_TELEPORT_PRICE,
+          L"Use '2' key  *  adds to inventory",  L"Exit dungeon, return to town"      },
     };
 
     const int colCX[2] = { 250, 550 };
@@ -1357,7 +1365,7 @@ void Player::RenderShopUI(HDC hdc)
 
         oldFont = (HFONT)SelectObject(hdc, smFont);
         SetTextColor(hdc, canBuy ? RGB(255, 255, 255) : RGB(140, 140, 140));
-        const wchar_t* btnBuf = L"구매";
+        const wchar_t* btnBuf = L"Buy";
         int blw = (int)wcslen(btnBuf) * 9;
         TextOutW(hdc, cx - blw / 2, btnY + 9, btnBuf, (int)wcslen(btnBuf));
         SelectObject(hdc, oldFont);   // restore
@@ -1427,15 +1435,15 @@ void Player::OnQuestUpdate(unsigned char questId, unsigned char state,
 }
 
 // ---------------------------------------------------------------------------
-// Quest panel — rendered above the minimap (bottom-right area)
+// Quest panel ??rendered above the minimap (bottom-right area)
 // Minimap is at (640, 440) size 150x150 per MiniMap.h
 // ---------------------------------------------------------------------------
 
 void Player::RenderQuestPanel(HDC hdc) const
 {
     // Names displayed to the player (hardcoded Korean; logic/rewards live in quests.lua)
-    static const wchar_t* kQuestNames[2]  = { L"[튜토리얼] 첫 만남", L"[전투] 몬스터 사냥" };
-    static const wchar_t* kQuestGoalDesc[2] = { L"Quest NPC에게 말 걸기", L"몬스터 5마리 처치" };
+        static const wchar_t* kQuestNames[2]  = { L"[Tutorial] Find the NPC", L"[Hunt] Monster Slayer" };
+        static const wchar_t* kQuestGoalDesc[2] = { L"Talk to Quest NPC", L"Kill 5 monsters" };
 
     // Check if any quest is active (state 1 or 2)
     bool anyActive = false;
@@ -1445,7 +1453,7 @@ void Player::RenderQuestPanel(HDC hdc) const
 
     // Panel position: just above minimap (minimap top-left is 640,440)
     const int PANEL_W = 200;
-    const int PANEL_X = 800 - PANEL_W - 10;  // 590 — align with minimap right edge
+    const int PANEL_X = 800 - PANEL_W - 10;  // 590 ??align with minimap right edge
     int panelH = 10;
     for (int i = 0; i < 2; ++i)
         if (mQuests[i].state >= 1 && mQuests[i].state <= 2) panelH += 42;
@@ -1483,17 +1491,17 @@ void Player::RenderQuestPanel(HDC hdc) const
         // Progress line
         SelectObject(hdc, descFont);
         if (i == 0) {
-            // Tutorial: just "완료! NPC에게 돌아가기" when complete
-            const wchar_t* txt = complete ? L"완료! NPC에게 돌아가기 [F]" : kQuestGoalDesc[i];
+            // Tutorial: just "?�료! NPC?�게 ?�아가�? when complete
+            const wchar_t* txt = complete ? L"Done! Return to NPC [F]" : kQuestGoalDesc[i];
             SetTextColor(hdc, complete ? RGB(80, 220, 80) : RGB(160, 160, 200));
             TextOutW(hdc, PANEL_X + 8, rowY, txt, (int)wcslen(txt));
         } else {
             // Kill quest: show X/Y progress bar
             wchar_t progBuf[48];
             if (complete)
-                swprintf_s(progBuf, L"완료! NPC에게 돌아가기 [F]");
+                swprintf_s(progBuf, L"Done! Return to NPC [F]");
             else
-                swprintf_s(progBuf, L"%d / %d 처치", (int)mQuests[i].progress, (int)mQuests[i].goal);
+                                swprintf_s(progBuf, L"%d / %d killed", (int)mQuests[i].progress, (int)mQuests[i].goal);
             SetTextColor(hdc, complete ? RGB(80, 220, 80) : RGB(200, 180, 100));
             TextOutW(hdc, PANEL_X + 8, rowY, progBuf, (int)wcslen(progBuf));
 
@@ -1548,7 +1556,7 @@ void Player::RenderAbilityUI(HDC hdc)
         HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
     HFONT oldFont = (HFONT)SelectObject(hdc, titleFont);
     SetTextColor(hdc, RGB(255, 220, 80));
-    const wchar_t* title = L"[ 능력치 투자 ]";
+        const wchar_t* title = L"[ Stat Investment ]";
     TextOutW(hdc, PX + PW / 2 - 80, PY + 12, title, (int)wcslen(title));
     DeleteObject(SelectObject(hdc, oldFont));
 
@@ -1557,13 +1565,13 @@ void Player::RenderAbilityUI(HDC hdc)
         HANGUL_CHARSET, 0, 0, 0, 0, L"NanumBarunGothic");
     oldFont = (HFONT)SelectObject(hdc, ptFont);
     wchar_t ptBuf[64];
-    swprintf_s(ptBuf, L"투자 가능 포인트: %d", (int)mStatPoints);
+    swprintf_s(ptBuf, L"Stat Points: %d", (int)mStatPoints);
     SetTextColor(hdc, mStatPoints > 0 ? RGB(100, 255, 100) : RGB(180, 80, 80));
     TextOutW(hdc, PX + PW / 2 - 85, PY + 40, ptBuf, (int)wcslen(ptBuf));
 
     // Close hint
     SetTextColor(hdc, RGB(150, 150, 150));
-    const wchar_t* hint = L"F / ESC: 닫기";
+        const wchar_t* hint = L"F / ESC: Close";
     TextOutW(hdc, PX + PW - 100, PY + 12, hint, (int)wcslen(hint));
     DeleteObject(SelectObject(hdc, oldFont));
 
@@ -1575,10 +1583,10 @@ void Player::RenderAbilityUI(HDC hdc)
         const wchar_t* effect2;
     };
     const StatInfo stats[4] = {
-        { L"STR", mStr,  L"일반 공격력 +3",       L"근접 공격 데미지 증가"  },
-        { L"INT", mIntl, L"기술 데미지 +4",       L"AOE 공격 시 적용"       },
-        { L"DEX", mDex,  L"이동속도 +5px/s",      L"최대 400px/s (8타일/s)" },
-        { L"LUK", mLuk,  L"크리티컬 확률 +1%",   L"크리티컬 배율 x1.5"     },
+                { L"STR", mStr,  L"Melee ATK+3",        L"Increases melee attack damage"   },
+        { L"INT", mIntl, L"Skill DMG+4",        L"Boosts AOE attack damage"        },
+        { L"DEX", mDex,  L"Move spd+5px/s",     L"Cap 400px/s (8 tiles/s)"        },
+                { L"LUK", mLuk,  L"Crit chance+1%",       L"Crit multiplier x1.5"       },
     };
 
     // Column centers
@@ -1670,7 +1678,7 @@ void Player::DungeonEnter(unsigned char entered, int instance_id, short tileX, s
     mLastSentX = tileX;
     mLastSentY = tileY;
 
-    // Clear all rendered objects — the server will re-send what's visible in the new zone.
+    // Clear all rendered objects ??the server will re-send what's visible in the new zone.
     mRenderList.clear();
     mSelfDamages.clear();
     mAttackEffects.clear();
@@ -1687,7 +1695,7 @@ void Player::RenderDungeonOverlay(HDC hdc)
         if (IsNearQuestNpc() && mPartyId >= 0) {
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, RGB(180, 255, 180));
-            const char* hint = "[G] 던전 입장";
+            const char* hint = "[G] Enter Dungeon";
             TextOutA(hdc, 10, 440, hint, (int)strlen(hint));
         }
         return;
@@ -1705,7 +1713,7 @@ void Player::RenderDungeonOverlay(HDC hdc)
     camera->WorldToScreen(worldMinX, worldMinY, sMinX, sMinY);
     camera->WorldToScreen(worldMaxX, worldMaxY, sMaxX, sMaxY);
 
-    // Floor fill — dark stone colour
+    // Floor fill ??dark stone colour
     HBRUSH floorBr = CreateSolidBrush(RGB(50, 48, 44));
     HPEN   nullPen  = (HPEN)GetStockObject(NULL_PEN);
     HBRUSH ob = (HBRUSH)SelectObject(hdc, floorBr);
@@ -1736,7 +1744,7 @@ void Player::RenderDungeonOverlay(HDC hdc)
     SelectObject(hdc, og);
     DeleteObject(gridPen);
 
-    // Border wall — bright stone edge
+    // Border wall ??bright stone edge
     HPEN borderPen = CreatePen(PS_SOLID, 3, RGB(160, 140, 100));
     HPEN obp = (HPEN)SelectObject(hdc, borderPen);
     SelectObject(hdc, GetStockObject(NULL_BRUSH));
@@ -1748,6 +1756,6 @@ void Player::RenderDungeonOverlay(HDC hdc)
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, RGB(255, 200, 80));
     char dunBuf[48];
-    sprintf_s(dunBuf, "[던전 #%d]   G: 나가기", mDungeonInstanceId);
+    sprintf_s(dunBuf, "[Dungeon #%d]   G: Exit", mDungeonInstanceId);
     TextOutA(hdc, 10, 440, dunBuf, (int)strlen(dunBuf));
 }

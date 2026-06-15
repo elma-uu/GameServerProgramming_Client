@@ -141,8 +141,15 @@ void Game::Render()
 		return;
 	}
 
+	// Layer 0: background
 	mMap.Render(mBackHdc);
-	mAvatar.Render(mBackHdc);
+	mAvatar.RenderLayer0(mBackHdc);
+
+	// Layer 1: entities (player, monsters, effects)
+	mAvatar.RenderLayer1(mBackHdc);
+
+	// Layer 2: HUD / UI panels
+	mAvatar.RenderLayer2(mBackHdc);
 	mMiniMap.Render(mBackHdc);
 	Time::Render(mBackHdc);
 	mChatSystem.Render(mBackHdc, Input::GetInputText());
