@@ -6,6 +6,8 @@ SpriteManager::MonSprites  SpriteManager::sMonsters[MON_COUNT]   = {};
 Gdiplus::Bitmap*           SpriteManager::sNpcSheets[NPC_TOWN_COUNT] = {};
 Gdiplus::Bitmap*           SpriteManager::sUiImages[5]               = {};
 Gdiplus::Bitmap*           SpriteManager::sItemImages[2]             = {};
+Gdiplus::Bitmap*           SpriteManager::sBossIdle                  = nullptr;
+Gdiplus::Bitmap*           SpriteManager::sBossHand                  = nullptr;
 bool         SpriteManager::sLoaded       = false;
 ULONG_PTR    SpriteManager::sGdiplusToken = 0;
 
@@ -90,6 +92,13 @@ void SpriteManager::Init()
         sItemImages[1] = LoadItemBmp(itemDir, L"teleport");
     }
 
+    // --- boss sprites ---
+    std::wstring bossDir = FindBossDir();
+    if (!bossDir.empty()) {
+        sBossIdle = LoadBossSheet(bossDir);
+        sBossHand = LoadHandSheet(bossDir);
+    }
+
     sLoaded = true;
 }
 
@@ -113,6 +122,8 @@ void SpriteManager::Shutdown()
     for (int i = 0; i < 2; ++i) {
         delete sItemImages[i]; sItemImages[i] = nullptr;
     }
+    delete sBossIdle; sBossIdle = nullptr;
+    delete sBossHand; sBossHand = nullptr;
     if (sGdiplusToken) {
         Gdiplus::GdiplusShutdown(sGdiplusToken);
         sGdiplusToken = 0;
@@ -519,4 +530,107 @@ void SpriteManager::DrawItemImage(HDC hdc, int itemIdx, int x, int y, int w, int
     Gdiplus::Graphics g(hdc);
     g.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
     g.DrawImage(bmp, x, y, w, h);
+}
+
+// ---------------------------------------------------------------------------
+// Boss Belial sprites (Resource/Boss/Belial/)
+// ---------------------------------------------------------------------------
+
+std::wstring SpriteManager::FindBossDir()
+{
+    WCHAR exeDir[MAX_PATH];
+    GetModuleFileNameW(nullptr, exeDir, MAX_PATH);
+    WCHAR* last = wcsrchr(exeDir, L'\\');
+    if (last) *(last + 1) = L'\0';
+
+    const wchar_t* candidates[] = {
+        L"..\\..\\game\\Resource\\Boss\\Belial\\",
+        L"..\\..\\..\\game\\Resource\\Boss\\Belial\\",
+        L"game\\Resource\\Boss\\Belial\\",
+        L"Resource\\Boss\\Belial\\",
+        L"..\\Resource\\Boss\\Belial\\",
+    };
+
+    for (const wchar_t* rel : candidates) {
+        WCHAR full[MAX_PATH];
+        swprintf_s(full, MAX_PATH, L"%s%s", exeDir, rel);
+        WCHAR probe[MAX_PATH];
+        swprintf_s(probe, MAX_PATH, L"%sHead\\idle.png", full);
+        if (GetFileAttributesW(probe) != INVALID_FILE_ATTRIBUTES)
+            return std::wstring(full);
+    }
+    return L"";
+}
+
+Gdiplus::Bitmap* SpriteManager::LoadBossSheet(const std::wstring& dir)
+{
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, MAX_PATH, L"%sHead\\idle.png", dir.c_str());
+    Gdiplus::Bitmap* bmp = Gdiplus::Bitmap::FromFile(path);
+    if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+        delete bmp;
+        return nullptr;
+    }
+    return bmp;
+}
+
+void SpriteManager::DrawBoss(HDC hdc, int frame, int screenX, int screenY, int drawW, int drawH)
+{
+    int destX = screenX - drawW / 2;
+    int destY = screenY - drawH / 2;
+
+    if (!sBossIdle) {
+        HBRUSH br  = CreateSolidBrush(RGB(160, 0, 0));
+        HBRUSH old = (HBRUSH)SelectObject(hdc, br);
+        Rectangle(hdc, destX, destY, destX + drawW, destY + drawH);
+        SelectObject(hdc, old);
+        DeleteObject(br);
+        return;
+    }
+
+    Gdiplus::Graphics g(hdc);
+    g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+    g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+    DrawFrame(g, sBossIdle, frame % BOSS_BELIAL_IDLE_FRAMES, BOSS_BELIAL_IDLE_FRAMES,
+              destX, destY, drawW, drawH, false);
+}
+
+// ---------------------------------------------------------------------------
+// Boss Belial hand sprite (Resource/Boss/Belial/Hand/idle.png, 9 frames)
+// flipH=true flips horizontally to produce the right hand from the left-hand sheet.
+// ---------------------------------------------------------------------------
+
+Gdiplus::Bitmap* SpriteManager::LoadHandSheet(const std::wstring& dir)
+{
+    wchar_t path[MAX_PATH];
+    swprintf_s(path, MAX_PATH, L"%sHand\\idle.png", dir.c_str());
+    Gdiplus::Bitmap* bmp = Gdiplus::Bitmap::FromFile(path);
+    if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+        delete bmp;
+        return nullptr;
+    }
+    return bmp;
+}
+
+void SpriteManager::DrawHand(HDC hdc, int frame, int screenX, int screenY,
+                              int drawW, int drawH, bool flipH)
+{
+    int destX = screenX - drawW / 2;
+    int destY = screenY - drawH / 2;
+
+    if (!sBossHand) {
+        // Fallback: dark purple rectangle
+        HBRUSH br  = CreateSolidBrush(RGB(80, 0, 120));
+        HBRUSH old = (HBRUSH)SelectObject(hdc, br);
+        Rectangle(hdc, destX, destY, destX + drawW, destY + drawH);
+        SelectObject(hdc, old);
+        DeleteObject(br);
+        return;
+    }
+
+    Gdiplus::Graphics g(hdc);
+    g.SetInterpolationMode(Gdiplus::InterpolationModeNearestNeighbor);
+    g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHalf);
+    DrawFrame(g, sBossHand, frame % BOSS_BELIAL_HAND_FRAMES, BOSS_BELIAL_HAND_FRAMES,
+              destX, destY, drawW, drawH, flipH);
 }

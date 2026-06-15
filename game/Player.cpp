@@ -225,12 +225,12 @@ void Player::Update()
         mMoveAccum = 0.0f;
     }
 
-    // Map boundary clamp ??dungeon instances live at X >= DUNGEON_BASE_X
+    // Dungeon uses local coordinate space: tiles 0..DUNGEON_SIZE-1
     if (mIsInDungeon && mDungeonInstanceId >= 0) {
-        int dMinX = (DUNGEON_BASE_X + mDungeonInstanceId * DUNGEON_STRIDE) * TILE_SIZE;
-        int dMaxX = dMinX + (DUNGEON_SIZE - 1) * TILE_SIZE + TILE_SIZE / 2;
-        int dMinY = DUNGEON_BASE_Y * TILE_SIZE;
-        int dMaxY = dMinY + (DUNGEON_SIZE - 1) * TILE_SIZE + TILE_SIZE / 2;
+        int dMinX = 0;
+        int dMaxX = (DUNGEON_SIZE - 1) * TILE_SIZE + TILE_SIZE / 2;
+        int dMinY = 0;
+        int dMaxY = (DUNGEON_SIZE - 1) * TILE_SIZE + TILE_SIZE / 2;
         int cx = GetX(), cy = GetY();
         if (cx < dMinX) SetPosition(dMinX, GetY());
         else if (cx > dMaxX) SetPosition(dMaxX, GetY());
@@ -436,6 +436,66 @@ void Player::RenderLayer2(HDC hdc)
         TextOutA(hdc, BAR_X + 4, BAR_Y + 1, hpBuf, (int)strlen(hpBuf));
     }
 
+    // Boss HP bar â€” shown at the top center while inside the dungeon
+    if (mIsInDungeon) {
+        // Find the boss head in the render list
+        int bossHp = 0, bossMaxHp = 1;
+        bool bossFound = false;
+        for (auto& [id, obj] : mRenderList) {
+            if (obj.visual_id == VISUAL_BOSS_BELIAL) {
+                bossHp    = obj.hp;
+                bossMaxHp = obj.max_hp > 0 ? obj.max_hp : 1;
+                bossFound = true;
+                break;
+            }
+        }
+        if (bossFound) {
+            // Use clipping rect to determine window width
+            RECT rc = {};
+            GetClipBox(hdc, &rc);
+            int winW = rc.right - rc.left;
+
+            const int BAR_H  = 22;
+            const int BAR_W  = winW / 2;              // half the screen width
+            const int BAR_X  = (winW - BAR_W) / 2;   // centered
+            const int BAR_Y  = 8;
+
+            int fillW = BAR_W * max(0, bossHp) / bossMaxHp;
+
+            HPEN nullPen  = (HPEN)GetStockObject(NULL_PEN);
+            HBRUSH bgBr   = CreateSolidBrush(RGB(30, 5, 5));
+            HBRUSH fillBr = CreateSolidBrush(RGB(180, 20, 20));
+            HBRUSH brdBr  = CreateSolidBrush(RGB(200, 160, 60));  // gold border
+
+            // Border (slightly larger rect)
+            HBRUSH ob = (HBRUSH)SelectObject(hdc, brdBr);
+            HPEN   op = (HPEN)SelectObject(hdc, nullPen);
+            Rectangle(hdc, BAR_X - 2, BAR_Y - 2, BAR_X + BAR_W + 2, BAR_Y + BAR_H + 2);
+
+            // Background
+            SelectObject(hdc, bgBr);
+            Rectangle(hdc, BAR_X, BAR_Y, BAR_X + BAR_W, BAR_Y + BAR_H);
+
+            // Fill
+            if (fillW > 0) {
+                SelectObject(hdc, fillBr);
+                Rectangle(hdc, BAR_X, BAR_Y, BAR_X + fillW, BAR_Y + BAR_H);
+            }
+
+            SelectObject(hdc, ob); SelectObject(hdc, op);
+            DeleteObject(bgBr); DeleteObject(fillBr); DeleteObject(brdBr);
+
+            // Label: "Belial  HP / MaxHP"
+            SetBkMode(hdc, TRANSPARENT);
+            SetTextColor(hdc, RGB(255, 220, 80));
+            char buf[48];
+            sprintf_s(buf, "Belial   %d / %d", bossHp, bossMaxHp);
+            SIZE ts; GetTextExtentPoint32A(hdc, buf, (int)strlen(buf), &ts);
+            TextOutA(hdc, BAR_X + (BAR_W - ts.cx) / 2, BAR_Y + (BAR_H - ts.cy) / 2,
+                     buf, (int)strlen(buf));
+        }
+    }
+
     RenderQuestPanel(hdc);
     RenderStats(hdc);
     RenderPartyPanel(hdc);
@@ -569,7 +629,31 @@ void Player::RenderObjects(HDC hdc)
         const int footBot  = screenY + half;  // bottom edge of sprite
 
         if (obj.object_id >= NPC_ID_START) {
-            if (obj.visual_id >= NPC_ABILITY) {
+            if (obj.visual_id == VISUAL_BOSS_BELIAL) {
+                // --- Belial Head: 9Ã—9 tiles (450px) ---
+                const int BOSS_DRAW = TILE_SIZE * 9;
+                int bossFrame = (int)(GetTickCount() / 120) % BOSS_BELIAL_IDLE_FRAMES;
+                SpriteManager::DrawBoss(hdc, bossFrame, screenX, screenY, BOSS_DRAW, BOSS_DRAW);
+
+                // Small floating HP bar just above the sprite (world-space visual)
+                int bossTop = screenY - BOSS_DRAW / 2;
+                DrawHpBar(hdc, screenX, bossTop - 10, obj.hp, obj.max_hp > 0 ? obj.max_hp : 1);
+
+                SetTextColor(hdc, RGB(255, 80, 80));
+                const std::string& nm = obj.obj_name;
+                TextOutA(hdc, screenX - (int)(nm.size() * 4), bossTop - 24,
+                         nm.c_str(), (int)nm.size());
+
+            } else if (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_L ||
+                       obj.visual_id == VISUAL_BOSS_BELIAL_HAND_R) {
+                // --- Belial Hands: 4Ã—4 tiles (200px), right hand is flipped ---
+                const int HAND_DRAW = TILE_SIZE * 4;
+                int handFrame = (int)(GetTickCount() / 120) % BOSS_BELIAL_HAND_FRAMES;
+                bool flip = (obj.visual_id == VISUAL_BOSS_BELIAL_HAND_R);
+                SpriteManager::DrawHand(hdc, handFrame, screenX, screenY,
+                                        HAND_DRAW, HAND_DRAW, flip);
+
+            } else if (obj.visual_id >= NPC_ABILITY) {
                 // --- Town NPC (Ability / Restaurant / Shop) ---
                 int npcFrame = (int)((GetTickCount() / 200) % 6); // max frames among all types
                 SpriteManager::DrawTownNpc(hdc, obj.visual_id, npcFrame,
@@ -691,7 +775,7 @@ void Player::AddDamageNumber(int attackerId, int objectId, int damage, bool isCr
             monName = it->second.obj_name;
 
         // \uXXXX escapes are encoding-independent ??always compile to correct UTF-16
-        // "[system] ?Œë ˆ?´ì–´ {id}ê°€ {monster}??ë¥? ê³µê²©?´ì„œ {damage} ?°ë?ì§€ë¥??…í˜”?µë‹ˆ??"
+        // "[system] ?ï¿½ë ˆ?ï¿½ì–´ {id}ê°€ {monster}??ï¿½? ê³µê²©?ï¿½ì„œ {damage} ?ï¿½ï¿½?ì§€ï¿½??ï¿½í˜”?ï¿½ë‹ˆ??"
         wchar_t wbuf[256];
         if (isCrit)
             swprintf_s(wbuf, 256,
@@ -740,7 +824,7 @@ void Player::RenderStats(HDC hdc)
 
     SetBkMode(hdc, TRANSPARENT);
 
-    // ?€?€ Stats ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+    // ?ï¿½?ï¿½ Stats ?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
     SetTextColor(hdc, RGB(200, 220, 255));
     char buf[64];
     sprintf_s(buf, "STR:%3d   INT:%3d", (int)mStr, (int)mIntl);
@@ -757,7 +841,7 @@ void Player::RenderStats(HDC hdc)
     sprintf_s(buf, "Gold: %d", mGold);
     TextOutA(hdc, PX + 4, PY + LH * 3, buf, (int)strlen(buf));
 
-    // ?€?€ Divider ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+    // ?ï¿½?ï¿½ Divider ?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
     HPEN divPen = CreatePen(PS_SOLID, 1, RGB(60, 60, 80));
     HPEN oldDiv = (HPEN)SelectObject(hdc, divPen);
     MoveToEx(hdc, PX + 2, PY + LH * 4 + 4, nullptr);
@@ -765,7 +849,7 @@ void Player::RenderStats(HDC hdc)
     SelectObject(hdc, oldDiv);
     DeleteObject(divPen);
 
-    // ?€?€ Inventory ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
+    // ?ï¿½?ï¿½ Inventory ?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½?ï¿½
     int invY = PY + LH * 4 + 10;
 
     // Potion row
@@ -1491,7 +1575,7 @@ void Player::RenderQuestPanel(HDC hdc) const
         // Progress line
         SelectObject(hdc, descFont);
         if (i == 0) {
-            // Tutorial: just "?„ë£Œ! NPC?ê²Œ ?Œì•„ê°€ê¸? when complete
+            // Tutorial: just "?ï¿½ë£Œ! NPC?ï¿½ê²Œ ?ï¿½ì•„ê°€ï¿½? when complete
             const wchar_t* txt = complete ? L"Done! Return to NPC [F]" : kQuestGoalDesc[i];
             SetTextColor(hdc, complete ? RGB(80, 220, 80) : RGB(160, 160, 200));
             TextOutW(hdc, PANEL_X + 8, rowY, txt, (int)wcslen(txt));
@@ -1703,11 +1787,11 @@ void Player::RenderDungeonOverlay(HDC hdc)
 
     Camera* camera = GAME.GetCamera();
 
-    // World-space extent of this dungeon instance
-    int worldMinX = (DUNGEON_BASE_X + mDungeonInstanceId * DUNGEON_STRIDE) * TILE_SIZE;
-    int worldMinY = DUNGEON_BASE_Y * TILE_SIZE;
-    int worldMaxX = worldMinX + DUNGEON_SIZE * TILE_SIZE;
-    int worldMaxY = worldMinY + DUNGEON_SIZE * TILE_SIZE;
+    // Dungeon uses local coordinate space (0..DUNGEON_SIZE*TILE_SIZE)
+    int worldMinX = 0;
+    int worldMinY = 0;
+    int worldMaxX = DUNGEON_SIZE * TILE_SIZE;
+    int worldMaxY = DUNGEON_SIZE * TILE_SIZE;
 
     int sMinX, sMinY, sMaxX, sMaxY;
     camera->WorldToScreen(worldMinX, worldMinY, sMinX, sMinY);

@@ -34,6 +34,9 @@ constexpr MonFrameInfo MON_FRAMES[4] = {
 // Keep legacy constant for existing code that uses it
 constexpr int MON_IDLE_FRAMES = 5;
 
+constexpr int BOSS_BELIAL_IDLE_FRAMES = 10;
+constexpr int BOSS_BELIAL_HAND_FRAMES = 9;
+
 class SpriteManager
 {
 public:
@@ -63,6 +66,12 @@ public:
     // Draw a shop item icon at (x, y) with given size.
     static void DrawItemImage(HDC hdc, int itemIdx, int x, int y, int w, int h);
     // itemIdx: 0=HP Potion  1=Teleport Scroll
+
+    // Draw Belial boss Head idle frame centered at (screenX, screenY).
+    static void DrawBoss(HDC hdc, int frame, int screenX, int screenY, int drawW, int drawH);
+
+    // Draw Belial boss Hand idle frame. flipH=true for right hand.
+    static void DrawHand(HDC hdc, int frame, int screenX, int screenY, int drawW, int drawH, bool flipH);
 
     static bool IsLoaded() { return sLoaded; }
 
@@ -97,6 +106,13 @@ private:
 
     // ---- shop item images: [0]=potion  [1]=teleport ----
     static Gdiplus::Bitmap* sItemImages[2];
+
+    // ---- boss sprites (Resource/Boss/Belial/) ----
+    static Gdiplus::Bitmap* sBossIdle;
+    static Gdiplus::Bitmap* sBossHand;
+    static std::wstring FindBossDir();
+    static Gdiplus::Bitmap* LoadBossSheet(const std::wstring& dir);
+    static Gdiplus::Bitmap* LoadHandSheet(const std::wstring& dir);
 
     static bool         sLoaded;
     static ULONG_PTR    sGdiplusToken;
