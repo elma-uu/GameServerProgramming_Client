@@ -835,11 +835,13 @@ void Player::RenderObjects(HDC hdc)
             // HP bar just above the sprite top
             DrawHpBar(hdc, screenX, spriteTop - 8, obj.hp, obj.max_hp);
 
-            // Monster name above the HP bar
+            // Monster name + level above the HP bar
             SetTextColor(hdc, RGB(255, 200, 100));
-            const std::string& nm = obj.obj_name;
-            TextOutA(hdc, screenX - (int)(nm.size() * 4),
-                spriteTop - 20, nm.c_str(), (int)nm.size());
+            char lvBuf[16];
+            sprintf_s(lvBuf, "Lv.%d ", (int)obj.level);
+            std::string nameWithLv = std::string(lvBuf) + obj.obj_name;
+            TextOutA(hdc, screenX - (int)(nameWithLv.size() * 4),
+                spriteTop - 20, nameWithLv.c_str(), (int)nameWithLv.size());
             }
 
         } else {
